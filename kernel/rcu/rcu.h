@@ -322,7 +322,7 @@ static inline void rcu_init_levelspread(int *levelspread, const int *levelcnt)
 		cprv = nr_cpu_ids;
 		for (i = rcu_num_lvls - 1; i >= 0; i--) {
 			ccur = levelcnt[i];
-			levelspread[i] = (cprv + ccur - 1) / ccur;
+			levelspread[i] = (cprv + ccur - 1) / ccur; /* 将原来的leaf 平均分配到每个node下， 保持node平衡*/
 			cprv = ccur;
 		}
 	}

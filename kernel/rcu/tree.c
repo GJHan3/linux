@@ -3540,16 +3540,16 @@ rcu_boot_init_percpu_data(int cpu, struct rcu_state *rsp)
 	struct rcu_data *rdp = per_cpu_ptr(rsp->rda, cpu);
 
 	/* Set up local state, ensuring consistent view of global state. */
-	rdp->grpmask = leaf_node_cpu_bit(rdp->mynode, cpu);
-	rdp->dynticks = &per_cpu(rcu_dynticks, cpu);
+	rdp->grpmask = leaf_node_cpu_bit(rdp->mynode, cpu); /* 当前cpu在node中的掩码 */
+	rdp->dynticks = &per_cpu(rcu_dynticks, cpu); /* 指向全局的rcu_dynticks */
 	WARN_ON_ONCE(rdp->dynticks->dynticks_nesting != 1);
 	WARN_ON_ONCE(rcu_dynticks_in_eqs(rcu_dynticks_snap(rdp->dynticks)));
-	rdp->rcu_ofl_gp_seq = rsp->gp_seq;
+	rdp->rcu_ofl_gp_seq = rsp->gp_seq; /* 以下4个元素暂不明白啥意思 */ /* Grace-period sequence 和hotplug相关 */
 	rdp->rcu_ofl_gp_flags = RCU_GP_CLEANED;
 	rdp->rcu_onl_gp_seq = rsp->gp_seq;
 	rdp->rcu_onl_gp_flags = RCU_GP_CLEANED;
-	rdp->cpu = cpu;
-	rdp->rsp = rsp;
+	rdp->cpu = cpu; /* 当前rdp对应的cpu */
+	rdp->rsp = rsp; /* 当前rdp对应的rsp */
 	rcu_boot_init_nocb_percpu_data(rdp);
 }
 
@@ -3573,8 +3573,8 @@ rcu_init_percpu_data(int cpu, struct rcu_state *rsp)
 	rdp->blimit = blimit;
 	if (rcu_segcblist_empty(&rdp->cblist) && /* No early-boot CBs? */
 	    !init_nocb_callback_list(rdp))
-		rcu_segcblist_init(&rdp->cblist);  /* Re-enable callbacks. */
-	rdp->dynticks->dynticks_nesting = 1;	/* CPU not up, no tearing. */
+		rcu_segcblist_init(&rdp->cblist);  /* Re-enable callbacks. */ /* 初始化call back list */
+	rdp->dynticks->dynticks_nesting = 1;	/* CPU not up, no tearing. */ /* dynticks_nesting = 1 */
 	rcu_dynticks_eqs_online();
 	raw_spin_unlock_rcu_node(rnp);		/* irqs remain disabled. */
 
@@ -3588,10 +3588,10 @@ rcu_init_percpu_data(int cpu, struct rcu_state *rsp)
 	rdp->beenonline = true;	 /* We have now been online. */
 	rdp->gp_seq = rnp->gp_seq;
 	rdp->gp_seq_needed = rnp->gp_seq;
-	rdp->cpu_no_qs.b.norm = true;
+	rdp->cpu_no_qs.b.norm = true; /* 记录本cpu 是否经历qs状态 */
 	rdp->rcu_qs_ctr_snap = per_cpu(rcu_dynticks.rcu_qs_ctr, cpu);
-	rdp->core_needs_qs = false;
-	rdp->rcu_iw_pending = false;
+	rdp->core_needs_qs = false; /* rcu 需要本cpu 上报状态 */
+	rdp->rcu_iw_pending = false; /* is iw pending */
 	rdp->rcu_iw_gp_seq = rnp->gp_seq - 1;
 	trace_rcu_grace_period(rsp->name, rdp->gp_seq, TPS("cpuonl"));
 	raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
@@ -3735,7 +3735,7 @@ void rcu_cpu_starting(unsigned int cpu)
 		rnp = rdp->mynode;
 		mask = rdp->grpmask;
 		raw_spin_lock_irqsave_rcu_node(rnp, flags);
-		rnp->qsmaskinitnext |= mask;
+		rnp->qsmaskinitnext |= mask; /* 将cpu对应的mask挂在上一级node上 */
 		oldmask = rnp->expmaskinitnext;
 		rnp->expmaskinitnext |= mask;
 		oldmask ^= rnp->expmaskinitnext;
@@ -3971,14 +3971,16 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 	/* Initialize the level-tracking arrays. */
 
 	for (i = 1; i < rcu_num_lvls; i++)
-		rsp->level[i] = rsp->level[i - 1] + num_rcu_lvl[i - 1];
+		rsp->level[i] = rsp->level[i - 1] + num_rcu_lvl[i - 1]; /* num_rcu_lvl, num of nodes of each level */
 	rcu_init_levelspread(levelspread, num_rcu_lvl);
 
 	/* Initialize the elements themselves, starting from the leaves. */
 
+	/* 从下而上， 遍历每一层 */
 	for (i = rcu_num_lvls - 1; i >= 0; i--) {
 		cpustride *= levelspread[i];
 		rnp = rsp->level[i];
+		/* 对于每一层的每一个node初始化 */
 		for (j = 0; j < num_rcu_lvl[i]; j++, rnp++) {
 			raw_spin_lock_init(&ACCESS_PRIVATE(rnp, lock));
 			lockdep_set_class_and_name(&ACCESS_PRIVATE(rnp, lock),
@@ -3991,41 +3993,44 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 			rnp->completedqs = rsp->gp_seq;
 			rnp->qsmask = 0;
 			rnp->qsmaskinit = 0;
-			rnp->grplo = j * cpustride;
-			rnp->grphi = (j + 1) * cpustride - 1;
+			rnp->grplo = j * cpustride; /* 当前node最小的cpu编号 */
+			rnp->grphi = (j + 1) * cpustride - 1; /* 当前CPU的最大CPU编号 */
 			if (rnp->grphi >= nr_cpu_ids)
-				rnp->grphi = nr_cpu_ids - 1;
+				rnp->grphi = nr_cpu_ids - 1; /* 对最大CPU编号进行修正 */
 			if (i == 0) {
+				/* 该node在上一层node中的编号 */
 				rnp->grpnum = 0;
 				rnp->grpmask = 0;
 				rnp->parent = NULL;
 			} else {
+				/* 该node在上一层node中的编号， 相当于在本层的编号是j， 对于上一层的某个node中的编号， 就是取余数 */
 				rnp->grpnum = j % levelspread[i - 1];
-				rnp->grpmask = 1UL << rnp->grpnum;
-				rnp->parent = rsp->level[i - 1] +
+				rnp->grpmask = 1UL << rnp->grpnum; /* 相应的掩码 */
+				rnp->parent = rsp->level[i - 1] + /* 对应的上一层的node */
 					      j / levelspread[i - 1];
 			}
-			rnp->level = i;
-			INIT_LIST_HEAD(&rnp->blkd_tasks);
-			rcu_init_one_nocb(rnp);
-			init_waitqueue_head(&rnp->exp_wq[0]);
+			rnp->level = i; /* 当前node的level编号 */
+			INIT_LIST_HEAD(&rnp->blkd_tasks); /* 初始化链表， blkd_tasks, 阻塞的task */
+			rcu_init_one_nocb(rnp); /* 这个是啥没看明白 */
+			init_waitqueue_head(&rnp->exp_wq[0]); /* 初始化四个waitqueue， 暂不清楚是做什么的 */
 			init_waitqueue_head(&rnp->exp_wq[1]);
 			init_waitqueue_head(&rnp->exp_wq[2]);
 			init_waitqueue_head(&rnp->exp_wq[3]);
-			spin_lock_init(&rnp->exp_lock);
+			spin_lock_init(&rnp->exp_lock); /* 初始化spinlock */
 		}
 	}
 
-	init_swait_queue_head(&rsp->gp_wq);
+	/* 初始化rcu state 结构体 */
+	init_swait_queue_head(&rsp->gp_wq);  /* 两个waitqueue， simple waitqueue， gp_wq, expedited_eq, 加快，促进*/
 	init_swait_queue_head(&rsp->expedited_wq);
-	rnp = rcu_first_leaf_node(rsp);
+	rnp = rcu_first_leaf_node(rsp); /* 获取最下面最左边的node */
 	for_each_possible_cpu(i) {
 		while (i > rnp->grphi)
 			rnp++;
-		per_cpu_ptr(rsp->rda, i)->mynode = rnp;
-		rcu_boot_init_percpu_data(i, rsp);
+		per_cpu_ptr(rsp->rda, i)->mynode = rnp; /* 将每个核 按照顺序，分别分配到每个node中， 每个核的rda指向 相应的node */
+		rcu_boot_init_percpu_data(i, rsp); /* 初始化每个核的percpu变量 */
 	}
-	list_add(&rsp->flavors, &rcu_struct_flavors);
+	list_add(&rsp->flavors, &rcu_struct_flavors); /* 将当前rsp加入到全局的 rcu flavors链表中 */
 }
 
 /*
@@ -4145,14 +4150,14 @@ void __init rcu_init(void)
 	if (dump_tree)
 		rcu_dump_rcu_node_tree(&rcu_sched_state);
 	__rcu_init_preempt();
-	open_softirq(RCU_SOFTIRQ, rcu_process_callbacks);
+	open_softirq(RCU_SOFTIRQ, rcu_process_callbacks); /* 注册softirq */
 
 	/*
 	 * We don't need protection against CPU-hotplug here because
 	 * this is called early in boot, before either interrupts
 	 * or the scheduler are operational.
 	 */
-	pm_notifier(rcu_pm_notify, 0);
+	pm_notifier(rcu_pm_notify, 0); /* 好像和加速有关 */
 	for_each_online_cpu(cpu) {
 		rcutree_prepare_cpu(cpu);
 		rcu_cpu_starting(cpu);
@@ -4160,9 +4165,9 @@ void __init rcu_init(void)
 	}
 
 	/* Create workqueue for expedited GPs and for Tree SRCU. */
-	rcu_gp_wq = alloc_workqueue("rcu_gp", WQ_MEM_RECLAIM, 0);
+	rcu_gp_wq = alloc_workqueue("rcu_gp", WQ_MEM_RECLAIM, 0); /* 申请workqueue， 查一下啥是workqueue */
 	WARN_ON(!rcu_gp_wq);
-	rcu_par_gp_wq = alloc_workqueue("rcu_par_gp", WQ_MEM_RECLAIM, 0);
+	rcu_par_gp_wq = alloc_workqueue("rcu_par_gp", WQ_MEM_RECLAIM, 0); /* 申请workqueue， 查一下啥是workqueue */
 	WARN_ON(!rcu_par_gp_wq);
 }
 
