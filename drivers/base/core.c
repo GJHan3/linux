@@ -1885,17 +1885,20 @@ int device_add(struct device *dev)
 	/* notify platform of device entry */
 	if (platform_notify)
 		platform_notify(dev);
-
+	
+	// 创建device file
 	error = device_create_file(dev, &dev_attr_uevent);
 	if (error)
 		goto attrError;
-
+	// 在class中创建symlink
 	error = device_add_class_symlinks(dev);
 	if (error)
 		goto SymlinkError;
+	// 添加属性
 	error = device_add_attrs(dev);
 	if (error)
 		goto AttrsError;
+	// 在bus中添加device
 	error = bus_add_device(dev);
 	if (error)
 		goto BusError;
@@ -2589,6 +2592,7 @@ EXPORT_SYMBOL_GPL(device_create_vargs);
  * Note: the struct class passed to this function must have previously
  * been created with a call to class_create().
  */
+// 创建device结构体，在sysfs中创建file
 struct device *device_create(struct class *class, struct device *parent,
 			     dev_t devt, void *drvdata, const char *fmt, ...)
 {

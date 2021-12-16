@@ -233,7 +233,7 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 		goto set_brk;
 
 	/* Always allow shrinking brk. */
-	if (brk <= mm->brk) {
+	if (brk <= mm->brk) {   //减小堆大小
 		if (!do_munmap(mm, newbrk, oldbrk-newbrk, &uf))
 			goto set_brk;
 		goto out;
@@ -245,7 +245,7 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 		goto out;
 
 	/* Ok, looks good - let it rip. */
-	if (do_brk_flags(oldbrk, newbrk-oldbrk, 0, &uf) < 0)
+	if (do_brk_flags(oldbrk, newbrk-oldbrk, 0, &uf) < 0) //如果返回0，表示增加成功，重新设置brk
 		goto out;
 
 set_brk:
@@ -2985,19 +2985,19 @@ static int do_brk_flags(unsigned long addr, unsigned long len, unsigned long fla
 		vm_unacct_memory(len >> PAGE_SHIFT);
 		return -ENOMEM;
 	}
-
+    //将vm_ops置为NULL，即为匿名页
 	vma_set_anonymous(vma);
 	vma->vm_start = addr;
 	vma->vm_end = addr + len;
-	vma->vm_pgoff = pgoff;
+	vma->vm_pgoff = pgoff; // 在地址空间中第几页
 	vma->vm_flags = flags;
-	vma->vm_page_prot = vm_get_page_prot(flags);
+	vma->vm_page_prot = vm_get_page_prot(flags); //protection flags
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 out:
 	perf_event_mmap(vma);
 	mm->total_vm += len >> PAGE_SHIFT;
 	mm->data_vm += len >> PAGE_SHIFT;
-	if (flags & VM_LOCKED)
+	if (flags & VM_LOCKED)  //看是否锁住
 		mm->locked_vm += (len >> PAGE_SHIFT);
 	vma->vm_flags |= VM_SOFTDIRTY;
 	return 0;

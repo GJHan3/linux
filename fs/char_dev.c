@@ -33,11 +33,11 @@ static DEFINE_MUTEX(chrdevs_lock);
 
 static struct char_device_struct {
 	struct char_device_struct *next;
-	unsigned int major;
-	unsigned int baseminor;
-	int minorct;
-	char name[64];
-	struct cdev *cdev;		/* will die */
+	unsigned int major; // 主设备号
+	unsigned int baseminor; // 第一个次设备号
+	int minorct; //次设备的数量
+	char name[64]; //名字
+	struct cdev *cdev;		/* will die */ 
 } *chrdevs[CHRDEV_MAJOR_HASH_SIZE];
 
 /* index in the above */
@@ -66,7 +66,7 @@ static int find_dynamic_major(void)
 {
 	int i;
 	struct char_device_struct *cd;
-
+  	//最小的主设备号是234
 	for (i = ARRAY_SIZE(chrdevs)-1; i >= CHRDEV_MAJOR_DYN_END; i--) {
 		if (chrdevs[i] == NULL)
 			return i;
@@ -74,6 +74,7 @@ static int find_dynamic_major(void)
 
 	for (i = CHRDEV_MAJOR_DYN_EXT_START;
 	     i >= CHRDEV_MAJOR_DYN_EXT_END; i--) {
+		// 这里将major取余255 分配到hash表中 
 		for (cd = chrdevs[major_to_index(i)]; cd; cd = cd->next)
 			if (cd->major == i)
 				break;
@@ -109,7 +110,7 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 		return ERR_PTR(-ENOMEM);
 
 	mutex_lock(&chrdevs_lock);
-
+	/* 如果没有指定主设备号, 找一个空闲的主设备号 */
 	if (major == 0) {
 		ret = find_dynamic_major();
 		if (ret < 0) {
@@ -119,7 +120,7 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 		}
 		major = ret;
 	}
-
+	// 最大的主设备号是512
 	if (major >= CHRDEV_MAJOR_MAX) {
 		pr_err("CHRDEV \"%s\" major requested (%u) is greater than the maximum (%u)\n",
 		       name, major, CHRDEV_MAJOR_MAX-1);
@@ -129,7 +130,7 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 
 	cd->major = major;
 	cd->baseminor = baseminor;
-	cd->minorct = minorct;
+	cd->minorct = minorct; //次设备号的数量
 	strlcpy(cd->name, name, sizeof(cd->name));
 
 	i = major_to_index(major);
@@ -268,6 +269,7 @@ int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count,
  * your module name has only one type of devices it's ok to use e.g. the name
  * of the module here.
  */
+//这里仅仅是将设备注册到设备号中，创建了cdev结构体，并没有创建设备文件
 int __register_chrdev(unsigned int major, unsigned int baseminor,
 		      unsigned int count, const char *name,
 		      const struct file_operations *fops)
@@ -275,23 +277,23 @@ int __register_chrdev(unsigned int major, unsigned int baseminor,
 	struct char_device_struct *cd;
 	struct cdev *cdev;
 	int err = -ENOMEM;
-
+	// 申请主设备号、次设备号，并且申请过的号码需要保存，保持互斥
 	cd = __register_chrdev_region(major, baseminor, count, name);
 	if (IS_ERR(cd))
 		return PTR_ERR(cd);
-
+	// 申请cdev结构体
 	cdev = cdev_alloc();
 	if (!cdev)
 		goto out2;
-
+	// 设置cdev结构体中的相关数据成员
 	cdev->owner = fops->owner;
 	cdev->ops = fops;
 	kobject_set_name(&cdev->kobj, "%s", name);
-
+	// 将cdev结构体 和 设备号绑定，加入全局索引结构中，通过设备号可以索引到cdev结构体
 	err = cdev_add(cdev, MKDEV(cd->major, baseminor), count);
 	if (err)
 		goto out;
-
+    // 这里的cd哪里还有用呢？？ 保持疑问,是不是有两种索引，一个是全局的。一个是char device的。
 	cd->cdev = cdev;
 
 	return major ? 0 : cd->major;
@@ -485,7 +487,7 @@ int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 
 	p->dev = dev;
 	p->count = count;
-
+	// cdev_map全局变量
 	error = kobj_map(cdev_map, dev, count, NULL,
 			 exact_match, exact_lock, p);
 	if (error)
@@ -666,6 +668,7 @@ static struct kobject *base_probe(dev_t dev, int *part, void *data)
 
 void __init chrdev_init(void)
 {
+	// 初始化 cdev_map
 	cdev_map = kobj_map_init(base_probe, &chrdevs_lock);
 }
 

@@ -4305,9 +4305,14 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 		struct alloc_context *ac, gfp_t *alloc_mask,
 		unsigned int *alloc_flags)
 {
+    // 最优先查找的zone
 	ac->high_zoneidx = gfp_zone(gfp_mask);
+    // zonelist， 本node highmem->normal->dma->其他node的zone，具体看思维导图
+    // zonelist中，有一个数组，按照优先级排列了所有node的zone
 	ac->zonelist = node_zonelist(preferred_nid, gfp_mask);
+    // nodemask，就是指定哪些node中的内存可以用
 	ac->nodemask = nodemask;
+    // 输入flag中指定的migratetype
 	ac->migratetype = gfpflags_to_migratetype(gfp_mask);
 
 	if (cpusets_enabled()) {
@@ -4326,6 +4331,7 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 	if (should_fail_alloc_page(gfp_mask, order))
 		return false;
 
+    //如果cma使能， 并且迁移类型是MIGRATE_MOVABLE， 则添加ALLOC_CMA属性
 	if (IS_ENABLED(CONFIG_CMA) && ac->migratetype == MIGRATE_MOVABLE)
 		*alloc_flags |= ALLOC_CMA;
 
@@ -4343,6 +4349,7 @@ static inline void finalise_ac(gfp_t gfp_mask, struct alloc_context *ac)
 	 * also used as the starting point for the zonelist iterator. It
 	 * may get reset for allocations that ignore memory policies.
 	 */
+    //根据之前的zonelist, high_zoneidx，查找最合适的zone
 	ac->preferred_zoneref = first_zones_zonelist(ac->zonelist,
 					ac->high_zoneidx, ac->nodemask);
 }
@@ -4359,7 +4366,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	gfp_t alloc_mask; /* The gfp_t that was actually used for allocation */
 	struct alloc_context ac = { };
 
-	gfp_mask &= gfp_allowed_mask;
+	gfp_mask &= gfp_allowed_mask; //boot阶段 GFP_BOOT_MASK， 初始化完成后 __GFP_BITS_MASK， 
 	alloc_mask = gfp_mask;
 	if (!prepare_alloc_pages(gfp_mask, order, preferred_nid, nodemask, &ac, &alloc_mask, &alloc_flags))
 		return NULL;
