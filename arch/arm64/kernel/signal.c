@@ -851,6 +851,8 @@ static void do_signal(struct pt_regs *regs)
 	/*
 	 * If we were from a system call, check for system call restarting...
 	 */
+    // 为什么在这里检测是否syscall？ --> 当信号处理完成后，直接回到svc执行的地址。
+    // 不需要在用户态继续判断一遍了。
 	if (syscall) {
 		continue_addr = regs->pc;
 		restart_addr = continue_addr - (compat_thumb_mode(regs) ? 2 : 4);
@@ -859,6 +861,7 @@ static void do_signal(struct pt_regs *regs)
 		/*
 		 * Avoid additional syscall restarting via ret_to_user.
 		 */
+        // 在进入el0_svc_common中，设置系统调用号，在这里消除
 		forget_syscall(regs);
 
 		/*
@@ -870,8 +873,8 @@ static void do_signal(struct pt_regs *regs)
 		case -ERESTARTSYS:
 		case -ERESTARTNOINTR:
 		case -ERESTART_RESTARTBLOCK:
-			regs->regs[0] = regs->orig_x0;
-			regs->pc = restart_addr;
+			regs->regs[0] = regs->orig_x0; // 这里用来存，svc下来的时候x0的值
+			regs->pc = restart_addr; // svc的地址
 			break;
 		}
 	}
@@ -880,6 +883,7 @@ static void do_signal(struct pt_regs *regs)
 	 * Get the signal to deliver. When running under ptrace, at this point
 	 * the debugger may change all of our registers.
 	 */
+    // 获取信号
 	if (get_signal(&ksig)) {
 		/*
 		 * Depending on the signal settings, we may need to revert the
@@ -894,7 +898,7 @@ static void do_signal(struct pt_regs *regs)
 			regs->regs[0] = -EINTR;
 			regs->pc = continue_addr;
 		}
-
+        // 处理信号
 		handle_signal(&ksig, regs);
 		return;
 	}

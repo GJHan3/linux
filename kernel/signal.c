@@ -2338,7 +2338,7 @@ bool get_signal(struct ksignal *ksig)
 	struct sighand_struct *sighand = current->sighand;
 	struct signal_struct *signal = current->signal;
 	int signr;
-
+    // 回头看下 这里的task_work_run
 	if (unlikely(current->task_works))
 		task_work_run();
 
@@ -2402,7 +2402,7 @@ relock:
 			spin_unlock_irq(&sighand->siglock);
 			goto relock;
 		}
-
+        // 从数据结构中获取信号
 		signr = dequeue_signal(current, &current->blocked, &ksig->info);
 
 		if (!signr)
@@ -2413,12 +2413,12 @@ relock:
 			if (!signr)
 				continue;
 		}
-
+        // 获取信号的action
 		ka = &sighand->action[signr-1];
 
 		/* Trace actually delivered signals. */
 		trace_signal_deliver(signr, &ksig->info, ka);
-
+        // 如果信号的动作是忽略，继续获取信号
 		if (ka->sa.sa_handler == SIG_IGN) /* Do nothing.  */
 			continue;
 		if (ka->sa.sa_handler != SIG_DFL) {
