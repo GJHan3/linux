@@ -952,17 +952,19 @@ do_group_exit(int exit_code)
 
 	if (signal_group_exit(sig))
 		exit_code = sig->group_exit_code;
-	else if (!thread_group_empty(current)) {
+	else if (!thread_group_empty(current)) { // 如果有子线程的话
 		struct sighand_struct *const sighand = current->sighand;
 
 		spin_lock_irq(&sighand->siglock);
 		if (signal_group_exit(sig))
 			/* Another thread got here before we took the lock.  */
+            // 从第二个线程开始， 直接退出， 退出码参考group_exit_code
 			exit_code = sig->group_exit_code;
 		else {
+            // 第一个线程进到这里，设置退出原因，设置SIGNAL_GROUP_EXIT， 并且唤醒其他所有线程
 			sig->group_exit_code = exit_code;
 			sig->flags = SIGNAL_GROUP_EXIT;
-			zap_other_threads(current);
+			zap_other_threads(current); // 给每个线程发送kill 信号
 		}
 		spin_unlock_irq(&sighand->siglock);
 	}

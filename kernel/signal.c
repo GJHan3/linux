@@ -67,6 +67,11 @@ static void __user *sig_handler(struct task_struct *t, int sig)
 
 static inline bool sig_handler_ignored(void __user *handler, int sig)
 {
+    // 忽略的动作， 要么是动作直接ignore， 
+    // 要么动作是SIG_DFL 并且是kernel_ignore的信号 ：
+    //   rt_sigmask(SIGCONT)   |  rt_sigmask(SIGCHLD)   | 
+	//   rt_sigmask(SIGWINCH)  |  rt_sigmask(SIGURG)    )
+
 	/* Is it explicitly or implicitly ignored? */
 	return handler == SIG_IGN ||
 	       (handler == SIG_DFL && sig_kernel_ignore(sig));
@@ -169,7 +174,7 @@ void recalc_sigpending(void)
 {
 	if (!recalc_sigpending_tsk(current) && !freezing(current) &&
 	    !klp_patch_pending(current))
-		clear_thread_flag(TIF_SIGPENDING);
+		clear_thread_flag(TIF_SIGPENDING); // 如果有信号的话，需要设置thread_info TIF_SIGPENDING状态位
 
 }
 
@@ -612,8 +617,10 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 	/* We only dequeue private signals from ourselves, we don't let
 	 * signalfd steal them
 	 */
+    // 首先从私有的pending池子里面取信号
 	signr = __dequeue_signal(&tsk->pending, mask, info, &resched_timer);
 	if (!signr) {
+        // 如果私有的pending池子里面没信号了， 从进程共享的shared_pending中取信号
 		signr = __dequeue_signal(&tsk->signal->shared_pending,
 					 mask, info, &resched_timer);
 #ifdef CONFIG_POSIX_TIMERS
@@ -642,11 +649,11 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 		}
 #endif
 	}
-
+    // 取完信号，重新计算一下task的信号状态
 	recalc_sigpending();
 	if (!signr)
 		return 0;
-
+    // 这里是ptrace相关的内容
 	if (unlikely(sig_kernel_stop(signr))) {
 		/*
 		 * Set a marker that we have dequeued a stop signal.  Our
@@ -2359,6 +2366,7 @@ relock:
 	 * we should notify the parent, prepare_signal(SIGCONT) encodes
 	 * the CLD_ si_code into SIGNAL_CLD_MASK bits.
 	 */
+    // 这里是ptrace相关的东西
 	if (unlikely(signal->flags & SIGNAL_CLD_MASK)) {
 		int why;
 
@@ -2389,7 +2397,7 @@ relock:
 
 		goto relock;
 	}
-
+    // 这里正式开始取信号
 	for (;;) {
 		struct k_sigaction *ka;
 
@@ -2424,7 +2432,7 @@ relock:
 		if (ka->sa.sa_handler != SIG_DFL) {
 			/* Run the handler.  */
 			ksig->ka = *ka;
-
+            // 如果信号只处理一次，这里把信号action设置为默认。
 			if (ka->sa.sa_flags & SA_ONESHOT)
 				ka->sa.sa_handler = SIG_DFL;
 
@@ -2510,6 +2518,7 @@ relock:
 		/*
 		 * Death signals, no core dump.
 		 */
+        // 如果收到kill 信号， 直接到这里， do_group_exit
 		do_group_exit(ksig->info.si_signo);
 		/* NOTREACHED */
 	}
@@ -2564,11 +2573,13 @@ static void retarget_shared_pending(struct task_struct *tsk, sigset_t *which)
 	sigset_t retarget;
 	struct task_struct *t;
 
+    // 将shard_pending中的信号取出来
 	sigandsets(&retarget, &tsk->signal->shared_pending.signal, which);
 	if (sigisemptyset(&retarget))
 		return;
 
 	t = tsk;
+    // 将信号发往可以接收这个信号的任务
 	while_each_thread(tsk, t) {
 		if (t->flags & PF_EXITING)
 			continue;
@@ -2586,6 +2597,7 @@ static void retarget_shared_pending(struct task_struct *tsk, sigset_t *which)
 	}
 }
 
+// do_exit()->exit_signals
 void exit_signals(struct task_struct *tsk)
 {
 	int group_stop = 0;
