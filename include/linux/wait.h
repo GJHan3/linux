@@ -1112,6 +1112,7 @@ int autoremove_wake_function(struct wait_queue_entry *wq_entry, unsigned mode, i
 		.entry		= LIST_HEAD_INIT((name).entry),			\
 	}
 
+//定义了一个autoremove_wake_function， 当wake_up的时候，调用这个function
 #define DEFINE_WAIT(name) DEFINE_WAIT_FUNC(name, autoremove_wake_function)
 
 #define init_wait(wait)								\

@@ -92,7 +92,7 @@ static int __wake_up_common(struct wait_queue_head *wq_head, unsigned int mode,
 		ret = curr->func(curr, mode, wake_flags, key);
 		if (ret < 0)
 			break;
-		if (ret && (flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
+		if (ret && (flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive) // 如果调用成功，并且这个entry是独占的，一般在wake_up中设置为1，即处理了1个这样的任务后，就不再处理了
 			break;
 
 		if (bookmark && (++cnt > WAITQUEUE_WALK_BREAK_CNT) &&
@@ -372,8 +372,9 @@ EXPORT_SYMBOL(finish_wait);
 
 int autoremove_wake_function(struct wait_queue_entry *wq_entry, unsigned mode, int sync, void *key)
 {
-	int ret = default_wake_function(wq_entry, mode, sync, key);
+	int ret = default_wake_function(wq_entry, mode, sync, key); // 实际调用try_to_wake_up
 
+    // 删除队列上的元素
 	if (ret)
 		list_del_init(&wq_entry->entry);
 

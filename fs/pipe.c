@@ -111,10 +111,10 @@ void pipe_wait(struct pipe_inode_info *pipe)
 	 * Pipes are system-local resources, so sleeping on them
 	 * is considered a noninteractive wait:
 	 */
-	prepare_to_wait(&pipe->wait, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(&pipe->wait, &wait, TASK_INTERRUPTIBLE); // 将wait entry 挂载到pipe->wait上， 当产生event的时候唤醒，继续往下走。
 	pipe_unlock(pipe);
 	schedule();
-	finish_wait(&pipe->wait, &wait);
+	finish_wait(&pipe->wait, &wait); // 这里将wait 从pipe->wait中拿下来
 	pipe_lock(pipe);
 }
 
