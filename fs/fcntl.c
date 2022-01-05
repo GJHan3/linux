@@ -764,10 +764,10 @@ static void send_sigio_to_task(struct task_struct *p,
 			BUG_ON((reason < POLL_IN) || ((reason - POLL_IN) >= NSIGPOLL));
 			if (reason - POLL_IN >= NSIGPOLL)
 				si.si_band  = ~0L;
-			else
-				si.si_band = mangle_poll(band_table[reason - POLL_IN]);
-			si.si_fd    = fd;
-			if (!do_send_sig_info(signum, &si, p, type))
+			else                
+				si.si_band = mangle_poll(band_table[reason - POLL_IN]); // 将poll_in 转换为bit表示的
+			si.si_fd    = fd; //将信号发送到线程中去
+			if (!do_send_sig_info(signum, &si, p, type)) // 发送信号
 				break;
 		/* fall-through: fall back on the old plain SIGIO signal */
 		case 0:
@@ -915,9 +915,10 @@ void fasync_free(struct fasync_struct *new)
 struct fasync_struct *fasync_insert_entry(int fd, struct file *filp, struct fasync_struct **fapp, struct fasync_struct *new)
 {
         struct fasync_struct *fa, **fp;
-
+    // 这里fasync 中含有一个链表， 所有的fasync加入的时候，都会挂在链表上。
 	spin_lock(&filp->f_lock);
 	spin_lock(&fasync_lock);
+    // 用file结构体来看是否已经添加过了，如果已经添加过 更新下fd就行了。否则将file结构体加入fasync_struct中，并且组成新fasync_struct的链表
 	for (fp = fapp; (fa = *fp) != NULL; fp = &fa->fa_next) {
 		if (fa->fa_file != filp)
 			continue;
@@ -979,7 +980,7 @@ int fasync_helper(int fd, struct file * filp, int on, struct fasync_struct **fap
 {
 	if (!on)
 		return fasync_remove_entry(filp, fapp);
-	return fasync_add_entry(fd, filp, fapp);
+	return fasync_add_entry(fd, filp, fapp); // fapp是传入的，比如event中就含有这个，所以event文件的时候，发生这个event相应的线程就会被唤醒
 }
 
 EXPORT_SYMBOL(fasync_helper);
@@ -989,6 +990,7 @@ EXPORT_SYMBOL(fasync_helper);
  */
 static void kill_fasync_rcu(struct fasync_struct *fa, int sig, int band)
 {
+    // 循环发送， 将所有挂载的fasync 线程全部发送一遍
 	while (fa) {
 		struct fown_struct *fown;
 

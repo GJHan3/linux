@@ -579,6 +579,7 @@ union rcu_special {
 	u32 s; /* Set of bits. */
 };
 
+// hw_context = 0, sw_context = 1 软硬件event分开， 根据上层应用的配置
 enum perf_event_task_context {
 	perf_invalid_context = -1,
 	perf_hw_context = 0,

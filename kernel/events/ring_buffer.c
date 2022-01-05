@@ -20,6 +20,7 @@
 
 static void perf_output_wakeup(struct perf_output_handle *handle)
 {
+    // 设置rb->poll
 	atomic_set(&handle->rb->poll, EPOLLIN);
 
 	handle->event->pending_wakeup = 1;
@@ -85,7 +86,7 @@ again:
 	 * See perf_output_begin().
 	 */
 	smp_wmb(); /* B, matches C */
-	rb->user_page->data_head = head;
+	rb->user_page->data_head = head; // 分user_page和data_page
 
 	/*
 	 * Now check if we missed an update -- rely on previous implied
@@ -97,7 +98,7 @@ again:
 	}
 
 	if (handle->wakeup != local_read(&rb->wakeup))
-		perf_output_wakeup(handle);
+		perf_output_wakeup(handle); //应该是wake up event对应的线程，采用异步io的形式
 
 out:
 	preempt_enable();
@@ -134,14 +135,14 @@ __perf_output_begin(struct perf_output_handle *handle,
 	 */
 	if (event->parent)
 		event = event->parent;
-
+    // 是不是event在创建的时候有ringbuffer。 应该是每个event都有ringbuffer
 	rb = rcu_dereference(event->rb);
 	if (unlikely(!rb))
 		goto out;
 
 	if (unlikely(rb->paused)) {
 		if (rb->nr_pages)
-			local_inc(&rb->lost);
+			local_inc(&rb->lost); //丢失的记录数
 		goto out;
 	}
 
@@ -159,12 +160,12 @@ __perf_output_begin(struct perf_output_handle *handle,
 
 	do {
 		tail = READ_ONCE(rb->user_page->data_tail);
-		offset = head = local_read(&rb->head);
-		if (!rb->overwrite) {
+		offset = head = local_read(&rb->head); // offset就是当前的写入地址
+		if (!rb->overwrite) { // 是否可覆盖，初始化的时候确定了。可覆盖的话直接往下进行，否则判断是否有空间
 			if (unlikely(!ring_buffer_has_space(head, tail,
 							    perf_data_size(rb),
-							    size, backward)))
-				goto fail;
+							    size, backward))) //判断ringbuffer是否还有空间
+				goto fail; // 没有有空间，则失败
 		}
 
 		/*
@@ -183,7 +184,7 @@ __perf_output_begin(struct perf_output_handle *handle,
 			head += size;
 		else
 			head -= size;
-	} while (local_cmpxchg(&rb->head, offset, head) != offset);
+	} while (local_cmpxchg(&rb->head, offset, head) != offset); // 无锁并发
 
 	if (backward) {
 		offset = head;
@@ -200,10 +201,10 @@ __perf_output_begin(struct perf_output_handle *handle,
 
 	page_shift = PAGE_SHIFT + page_order(rb);
 
-	handle->page = (offset >> page_shift) & (rb->nr_pages - 1);
+	handle->page = (offset >> page_shift) & (rb->nr_pages - 1); // 计算第几页
 	offset &= (1UL << page_shift) - 1;
-	handle->addr = rb->data_pages[handle->page] + offset;
-	handle->size = (1UL << page_shift) - offset;
+	handle->addr = rb->data_pages[handle->page] + offset; // 获取ring buffer的写入地址
+	handle->size = (1UL << page_shift) - offset; // 剩余的size
 
 	if (unlikely(have_lost)) {
 		struct perf_sample_data sample_data;
@@ -223,7 +224,7 @@ __perf_output_begin(struct perf_output_handle *handle,
 	return 0;
 
 fail:
-	local_inc(&rb->lost);
+	local_inc(&rb->lost); // 失败就直接增加lost数量，返回没有空间的错误码
 	perf_output_put_handle(handle);
 out:
 	rcu_read_unlock();
@@ -231,6 +232,7 @@ out:
 	return -ENOSPC;
 }
 
+// 差别在__perf_output_begin 最后一个false/true
 int perf_output_begin_forward(struct perf_output_handle *handle,
 			     struct perf_event *event, unsigned int size)
 {
@@ -295,7 +297,7 @@ ring_buffer_init(struct ring_buffer *rb, long watermark, int flags)
 	 * rb->paused must be true if we have no pages for output.
 	 */
 	if (!rb->nr_pages)
-		rb->paused = 1;
+		rb->paused = 1; // 如果没有空间，则无法写入ringbuffer
 }
 
 void perf_aux_output_flag(struct perf_output_handle *handle, u64 flags)
@@ -715,6 +717,7 @@ static void *perf_mmap_alloc_page(int cpu)
 	return page_address(page);
 }
 
+//调用perfmap的时候 申请ring_buffer
 struct ring_buffer *rb_alloc(int nr_pages, long watermark, int cpu, int flags)
 {
 	struct ring_buffer *rb;

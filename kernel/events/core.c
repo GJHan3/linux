@@ -2196,6 +2196,7 @@ EXPORT_SYMBOL_GPL(perf_event_disable);
 
 void perf_event_disable_inatomic(struct perf_event *event)
 {
+    // 这个函数应该是将event设置为等待disable状态，并且加入到irq_work_queue中，在某个时机触发
 	event->pending_disable = 1;
 	irq_work_queue(&event->pending);
 }
@@ -4866,7 +4867,7 @@ static __poll_t perf_poll(struct file *file, poll_table *wait)
 	struct perf_event *event = file->private_data;
 	struct ring_buffer *rb;
 	__poll_t events = EPOLLHUP;
-
+    // 等待轮询
 	poll_wait(file, &event->waitq, wait);
 
 	if (is_event_hup(event))
@@ -5007,6 +5008,7 @@ static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
 static int perf_copy_attr(struct perf_event_attr __user *uattr,
 			  struct perf_event_attr *attr);
 
+// perf的用户ioctl
 static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned long arg)
 {
 	void (*func)(struct perf_event *);
@@ -5376,7 +5378,7 @@ static void ring_buffer_wakeup(struct perf_event *event)
 	rb = rcu_dereference(event->rb);
 	if (rb) {
 		list_for_each_entry_rcu(event, &rb->event_list, rb_entry)
-			wake_up_all(&event->waitq);
+			wake_up_all(&event->waitq); // 唤醒每个event， 有些event在poll
 	}
 	rcu_read_unlock();
 }
@@ -5735,7 +5737,7 @@ aux_unlock:
 	 * vma.
 	 */
 	vma->vm_flags |= VM_DONTCOPY | VM_DONTEXPAND | VM_DONTDUMP;
-	vma->vm_ops = &perf_mmap_vmops;
+	vma->vm_ops = &perf_mmap_vmops; //设置perf vma的回调函数
 
 	if (event->pmu->event_mapped)
 		event->pmu->event_mapped(event, vma->vm_mm);
@@ -5750,6 +5752,7 @@ static int perf_fasync(int fd, struct file *filp, int on)
 	int retval;
 
 	inode_lock(inode);
+    // 为什么传入fd, filp， 其中fd是应用层看的， filp是驱动层看的。
 	retval = fasync_helper(fd, filp, on, &event->fasync);
 	inode_unlock(inode);
 
@@ -5788,13 +5791,15 @@ static inline struct fasync_struct **perf_event_fasync(struct perf_event *event)
 void perf_event_wakeup(struct perf_event *event)
 {
 	ring_buffer_wakeup(event);
-
+    // pending kill的意思，是等待发送信号
 	if (event->pending_kill) {
+        // 应该在应用层创建文件的时候，会为每个event创建文件，event的fasync就会通知对应的进程
 		kill_fasync(perf_event_fasync(event), SIGIO, event->pending_kill);
 		event->pending_kill = 0;
 	}
 }
 
+// 这里应该是irq_work_queue的处理函数
 static void perf_pending_event(struct irq_work *entry)
 {
 	struct perf_event *event = container_of(entry,
@@ -6489,6 +6494,7 @@ void perf_prepare_sample(struct perf_event_header *header,
 		data->phys_addr = perf_virt_to_phys(data->addr);
 }
 
+//这里是最终event的输出
 static __always_inline void
 __perf_event_output(struct perf_event *event,
 		    struct perf_sample_data *data,
@@ -6503,11 +6509,13 @@ __perf_event_output(struct perf_event *event,
 	/* protect the callchain buffers */
 	rcu_read_lock();
 
+    // 组装header, 填充data
 	perf_prepare_sample(&header, data, event, regs);
 
+    // 输出的主函数 perf_output_begin_backward/perf_output_begin_forward
 	if (output_begin(&handle, event, header.size))
 		goto exit;
-
+    // 把header 和 data的数据都往handle中填充
 	perf_output_sample(&handle, &header, data, event);
 
 	perf_output_end(&handle);
@@ -6524,6 +6532,7 @@ perf_event_output_forward(struct perf_event *event,
 	__perf_event_output(event, data, regs, perf_output_begin_forward);
 }
 
+// Write ring buffer from end to beginning
 void
 perf_event_output_backward(struct perf_event *event,
 			   struct perf_sample_data *data,
@@ -7747,28 +7756,28 @@ static int __perf_event_overflow(struct perf_event *event,
 	 * Non-sampling counters might still use the PMI to fold short
 	 * hardware counters, ignore those.
 	 */
-	if (unlikely(!is_sampling_event(event)))
+	if (unlikely(!is_sampling_event(event))) // 不处理非采样event
 		return 0;
 
-	ret = __perf_event_account_interrupt(event, throttle);
+	ret = __perf_event_account_interrupt(event, throttle); // 处理中断数量问题
 
 	/*
 	 * XXX event_limit might not quite work as expected on inherited
 	 * events
 	 */
 
-	event->pending_kill = POLL_IN;
-	if (events && atomic_dec_and_test(&event->event_limit)) {
+	event->pending_kill = POLL_IN; // 有数据读了
+	if (events && atomic_dec_and_test(&event->event_limit)) { // 这里应该是判断event的数量是否超过系统设置的。
 		ret = 1;
-		event->pending_kill = POLL_HUP;
-
+		event->pending_kill = POLL_HUP; // 这里应该是设置某个状态， 这个状态应该是表示io hup住了， 不再连接
 		perf_event_disable_inatomic(event);
 	}
 
-	READ_ONCE(event->overflow_handler)(event, data, regs);
+	READ_ONCE(event->overflow_handler)(event, data, regs); // 调用对应的event overflow handler
 
-	if (*perf_event_fasync(event) && event->pending_kill) {
-		event->pending_wakeup = 1;
+    // 这里的意思是， 如果注册了异步io， 并且有pending kill的必要。
+	if (*perf_event_fasync(event) && event->pending_kill) {  // 这里是啥意思？？？？？ 
+		event->pending_wakeup = 1; // 将pending wake置1， 然后再irq_work_queue中执行（perf_pending_event）
 		irq_work_queue(&event->pending);
 	}
 
@@ -9624,7 +9633,7 @@ skip_type:
 		goto got_cpu_context;
 
 	ret = -ENOMEM;
-	pmu->pmu_cpu_context = alloc_percpu(struct perf_cpu_context);
+	pmu->pmu_cpu_context = alloc_percpu(struct perf_cpu_context); // 每个pmu都有cpu_context
 	if (!pmu->pmu_cpu_context)
 		goto free_dev;
 
@@ -10009,6 +10018,7 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 		event->overflow_handler	= overflow_handler;
 		event->overflow_handler_context = context;
 	} else if (is_write_backward(event)){
+        // Write ring buffer from end to beginning
 		event->overflow_handler = perf_event_output_backward;
 		event->overflow_handler_context = NULL;
 	} else {

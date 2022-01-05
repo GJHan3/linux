@@ -9,6 +9,7 @@
 
 #define RING_BUFFER_WRITABLE		0x01
 
+// event的ringbuffer
 struct ring_buffer {
 	atomic_t			refcount;
 	struct rcu_head			rcu_head;
@@ -68,7 +69,7 @@ static inline void rb_free_rcu(struct rcu_head *rcu_head)
 
 static inline void rb_toggle_paused(struct ring_buffer *rb, bool pause)
 {
-	if (!pause && rb->nr_pages)
+	if (!pause && rb->nr_pages) // 是否需要停顿，ringbuffer写入，停顿的话，不记录record
 		rb->paused = 0;
 	else
 		rb->paused = 1;
@@ -155,7 +156,7 @@ static inline unsigned long perf_aux_size(struct ring_buffer *rb)
 static inline unsigned long						\
 func_name(struct perf_output_handle *handle,				\
 	  const void *buf, unsigned long len)				\
-__DEFINE_OUTPUT_COPY_BODY(true, memcpy_func, handle->addr, buf, size)
+__DEFINE_OUTPUT_COPY_BODY(true, memcpy_func, handle->addr, buf, size) // 这里定义了拷贝的地址 往handle->addr拷贝
 
 static inline unsigned long
 __output_custom(struct perf_output_handle *handle, perf_copy_f copy_func,
