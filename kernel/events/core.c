@@ -7814,14 +7814,14 @@ u64 perf_swevent_set_period(struct perf_event *event)
 	hwc->last_period = hwc->sample_period;
 
 again:
-	old = val = local64_read(&hwc->period_left);
+	old = val = local64_read(&hwc->period_left); // 如果val < 0， 说明这个周期还没有记录完， 如果val大于等于0， 重新设置period_left
 	if (val < 0)
 		return 0;
 
 	nr = div64_u64(period + val, period);
 	offset = nr * period;
-	val -= offset;
-	if (local64_cmpxchg(&hwc->period_left, old, val) != old)
+	val -= offset; // val可能跑的多了， 那么就将这部分在新的周期中计算。
+	if (local64_cmpxchg(&hwc->period_left, old, val) != old) // cmpxchg 返回的是原先内存的值，因此如果返回值不等于old， 说明此次操作无效。 这里处理并发问题
 		goto again;
 
 	return nr;
@@ -7835,13 +7835,13 @@ static void perf_swevent_overflow(struct perf_event *event, u64 overflow,
 	int throttle = 0;
 
 	if (!overflow)
-		overflow = perf_swevent_set_period(event);
+		overflow = perf_swevent_set_period(event); // 在这里再次判断是否溢出， 为什么要判断呢？ 是并发的问题， 可能其他核也在记录
 
-	if (hwc->interrupts == MAX_INTERRUPTS)
+	if (hwc->interrupts == MAX_INTERRUPTS) // 在perf_event_over_flow中记录interrupts的数量
 		return;
 
 	for (; overflow; overflow--) {
-		if (__perf_event_overflow(event, throttle,
+		if (__perf_event_overflow(event, throttle,  // 如果溢出，则__perf_event_overflow， 这里throttle后期在看下
 					    data, regs)) {
 			/*
 			 * We inhibit the overflow from happening when
@@ -7859,27 +7859,28 @@ static void perf_swevent_event(struct perf_event *event, u64 nr,
 {
 	struct hw_perf_event *hwc = &event->hw;
 
-	local64_add(nr, &event->count);
+	local64_add(nr, &event->count); // 增加数值
 
-	if (!regs)
+	if (!regs) // 如果regs 为空，直接退出
 		return;
 
-	if (!is_sampling_event(event))
+	if (!is_sampling_event(event)) // 如果不是采样类型的，直接退出，record、top应该是采样类型的。stat不是采样类型的。
 		return;
-
+    // 如果是周期采样，设置采样周期是nr 
 	if ((event->attr.sample_type & PERF_SAMPLE_PERIOD) && !event->attr.freq) {
 		data->period = nr;
-		return perf_swevent_overflow(event, 1, data, regs);
+		return perf_swevent_overflow(event, 1, data, regs); // 这里的数值1，表示是否溢出
 	} else
-		data->period = event->hw.last_period;
+		data->period = event->hw.last_period; //如果是频率采样，设置采样周期为last_period， 这个周期是计算好的周期。
 
+    // 以下都是频率采样才有的
 	if (nr == 1 && hwc->sample_period == 1 && !event->attr.freq)
 		return perf_swevent_overflow(event, 1, data, regs);
 
-	if (local64_add_negative(nr, &hwc->period_left))
+	if (local64_add_negative(nr, &hwc->period_left)) // 加了之后是否为负数， 负数为false
 		return;
 
-	perf_swevent_overflow(event, 0, data, regs);
+	perf_swevent_overflow(event, 0, data, regs); // period 加了之后为大于等于0的数， 那为什么这里还是0呢？？ -----> 并发问题，所以在内部调用perf_swevent_set_period时候处理并发问题
 }
 
 static int perf_exclude_event(struct perf_event *event,
@@ -7976,13 +7977,14 @@ static void do_perf_sw_event(enum perf_type_id type, u32 event_id,
 	struct hlist_head *head;
 
 	rcu_read_lock();
+    // 通过type/event_id的值，从swhash中找到对应的hash head
 	head = find_swevent_head_rcu(swhash, type, event_id);
 	if (!head)
 		goto end;
-
+    // 遍历hash head， 找到对应的software event
 	hlist_for_each_entry_rcu(event, head, hlist_entry) {
 		if (perf_swevent_match(event, type, event_id, data, regs))
-			perf_swevent_event(event, nr, data, regs);
+			perf_swevent_event(event, nr, data, regs);  // 增加perf event数值，如果达到溢出条件，则溢出
 	}
 end:
 	rcu_read_unlock();

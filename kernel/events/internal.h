@@ -204,7 +204,7 @@ DEFINE_OUTPUT_COPY(__output_copy_user, arch_perf_out_copy_user)
 static inline int get_recursion_context(int *recursion)
 {
 	int rctx;
-
+    //判断是否递归了
 	if (unlikely(in_nmi()))
 		rctx = 3;
 	else if (in_irq())
