@@ -112,7 +112,7 @@ union kernfs_node_id {
 		 * fields of 'struct fid' exactly.
 		 */
 		u32		ino;
-		u32		generation;
+		u32		generation; //应该是通过generation ino， 提供更多的id
 	};
 	u64			id;
 };
@@ -141,10 +141,10 @@ struct kernfs_node {
 	struct kernfs_node	*parent;
 	const char		*name;
 
-	struct rb_node		rb;
+	struct rb_node		rb; // 添加到红黑树上的。
 
 	const void		*ns;	/* namespace tag */
-	unsigned int		hash;	/* ns + name hash */
+	unsigned int		hash;	/* ns + name hash */  // 哈希值
 	union {
 		struct kernfs_elem_dir		dir;
 		struct kernfs_elem_symlink	symlink;

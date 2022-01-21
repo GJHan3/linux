@@ -444,7 +444,7 @@ retry:
 	if (error)
 		goto dput_and_out;
 
-	set_fs_pwd(current->fs, &path);
+	set_fs_pwd(current->fs, &path); // 这里设置的是当前线程的。。  所以到底是怎么显示的呢？？
 
 dput_and_out:
 	path_put(&path);
@@ -766,7 +766,7 @@ static int do_dentry_open(struct file *f,
 	/* normally all 3 are set; ->open() can clear them if needed */
 	f->f_mode |= FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	if (!open)
-		open = f->f_op->open;
+		open = f->f_op->open; // open函数
 	if (open) {
 		error = open(inode, f);
 		if (error)

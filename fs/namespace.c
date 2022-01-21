@@ -3011,6 +3011,7 @@ out_type:
 	return ret;
 }
 
+// mount系统调用
 SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 		char __user *, type, unsigned long, flags, void __user *, data)
 {

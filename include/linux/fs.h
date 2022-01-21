@@ -896,7 +896,7 @@ struct file {
 	enum rw_hint		f_write_hint;
 	atomic_long_t		f_count;
 	unsigned int 		f_flags;
-	fmode_t			f_mode;
+	fmode__t			f_mode;
 	struct mutex		f_pos_lock;
 	loff_t			f_pos;
 	struct fown_struct	f_owner;

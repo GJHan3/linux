@@ -214,6 +214,7 @@ int kernfs_iop_getattr(const struct path *path, struct kstat *stat,
 	return 0;
 }
 
+// 设置inode, 在这里把inode和kernfs_node关联起来了， inode的operation 对应kernfs的operation
 static void kernfs_init_inode(struct kernfs_node *kn, struct inode *inode)
 {
 	kernfs_get(kn);

@@ -221,26 +221,26 @@
 
 /**
  * DOC: OA Tail Pointer Race
- *
+ * 应该是寄存器更新和写入内存之间，存在一个时间差。 如何判断内存已经可见了
  * There's a HW race condition between OA unit tail pointer register updates and
  * writes to memory whereby the tail pointer can sometimes get ahead of what's
  * been written out to the OA buffer so far (in terms of what's visible to the
  * CPU).
- *
+ * 虽然可以显示的判断内存的内容，为了减少不必要的读操作
  * Although this can be observed explicitly while copying reports to userspace
  * by checking for a zeroed report-id field in tail reports, we want to account
  * for this earlier, as part of the oa_buffer_check to avoid lots of redundant
  * read() attempts.
- *
+ * 定义了一个尾指针，落后真的尾指针至少OA_TAIL_MARGIN_NSEC， 从而能够确保内存可见
  * In effect we define a tail pointer for reading that lags the real tail
  * pointer by at least %OA_TAIL_MARGIN_NSEC nanoseconds, which gives enough
  * time for the corresponding reports to become visible to the CPU.
- *
+ * // aging pointer是需要被跟踪，直到数据CPU可见
  * To manage this we actually track two tail pointers:
  *  1) An 'aging' tail with an associated timestamp that is tracked until we
  *     can trust the corresponding data is visible to the CPU; at which point
  *     it is considered 'aged'.
- *  2) An 'aged' tail that can be used for read()ing.
+ *  2) An 'aged' tail that can be used for read()ing. // aged pointer数据可见
  *
  * The two separate pointers let us decouple read()s from tail pointer aging.
  *
@@ -425,17 +425,17 @@ static u32 gen7_oa_hw_tail_read(struct drm_i915_private *dev_priv)
 /**
  * oa_buffer_check_unlocked - check for data and update tail ptr state
  * @dev_priv: i915 device instance
- *
+ * 通过文件系统的read()函数 或者 定时器周期性200Hz读取， 检测是否有数据可给用户空间读
  * This is either called via fops (for blocking reads in user ctx) or the poll
  * check hrtimer (atomic ctx) to check the OA buffer tail pointer and check
- * if there is data available for userspace to read.
+ * if there is data available for userspace to read. 
  *
  * This function is central to providing a workaround for the OA unit tail
  * pointer having a race with respect to what data is visible to the CPU.
  * It is responsible for reading tail pointers from the hardware and giving
  * the pointers time to 'age' before they are made available for reading.
  * (See description of OA_TAIL_MARGIN_NSEC above for further details.)
- *
+ * 除了表示可读之外， 这个函数更新了一些状态。 
  * Besides returning true when there is data available to read() this function
  * also has the side effect of updating the oa_buffer.tails[], .aging_timestamp
  * and .aged_tail_idx state used for reading.
@@ -443,7 +443,7 @@ static u32 gen7_oa_hw_tail_read(struct drm_i915_private *dev_priv)
  * Note: It's safe to read OA config state here unlocked, assuming that this is
  * only called while the stream is enabled, while the global OA configuration
  * can't be modified.
- *
+ * 如果oa buffer有数据，返回true， 否则返回false
  * Returns: %true if the OA buffer contains data, else %false
  */
 static bool oa_buffer_check_unlocked(struct drm_i915_private *dev_priv)
@@ -470,14 +470,14 @@ static bool oa_buffer_check_unlocked(struct drm_i915_private *dev_priv)
 	aged_tail = dev_priv->perf.oa.oa_buffer.tails[aged_idx].offset;
 	aging_tail = dev_priv->perf.oa.oa_buffer.tails[!aged_idx].offset;
 
-	hw_tail = dev_priv->perf.oa.ops.oa_hw_tail_read(dev_priv);
+	hw_tail = dev_priv->perf.oa.ops.oa_hw_tail_read(dev_priv); // 读硬件tail
 
 	/* The tail pointer increases in 64 byte increments,
 	 * not in report_size steps...
 	 */
 	hw_tail &= ~(report_size - 1);
 
-	now = ktime_get_mono_fast_ns();
+	now = ktime_get_mono_fast_ns(); //获得当前时间
 
 	/* Update the aged tail
 	 *
@@ -493,7 +493,7 @@ static bool oa_buffer_check_unlocked(struct drm_i915_private *dev_priv)
 	    ((now - dev_priv->perf.oa.oa_buffer.aging_timestamp) >
 	     OA_TAIL_MARGIN_NSEC)) {
 
-		aged_idx ^= 1;
+		aged_idx ^= 1; // 当aging taild里面的值过了一小段时间OA_TAIL_MARGIN_NSEC， 才能跟新到aged_tail里面
 		dev_priv->perf.oa.oa_buffer.aged_tail_idx = aged_idx;
 
 		aged_tail = aging_tail;
@@ -524,7 +524,7 @@ static bool oa_buffer_check_unlocked(struct drm_i915_private *dev_priv)
 		if (hw_tail >= gtt_offset &&
 		    hw_tail < (gtt_offset + OA_BUFFER_SIZE)) {
 			dev_priv->perf.oa.oa_buffer.tails[!aged_idx].offset =
-				aging_tail = hw_tail;
+				aging_tail = hw_tail; //更新aging_taild的值， 需要等一会儿才会更新到aged里面
 			dev_priv->perf.oa.oa_buffer.aging_timestamp = now;
 		} else {
 			DRM_ERROR("Ignoring spurious out of range OA buffer tail pointer = %u\n",
@@ -535,7 +535,7 @@ static bool oa_buffer_check_unlocked(struct drm_i915_private *dev_priv)
 	spin_unlock_irqrestore(&dev_priv->perf.oa.oa_buffer.ptr_lock, flags);
 
 	return aged_tail == INVALID_TAIL_PTR ?
-		false : OA_TAKEN(aged_tail, head) >= report_size;
+		false : OA_TAKEN(aged_tail, head) >= report_size;  // 能否读，其实看的是aged_tail
 }
 
 /**

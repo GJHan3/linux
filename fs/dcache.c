@@ -2964,7 +2964,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 		}
 	}
 out:
-	__d_add(dentry, inode);
+	__d_add(dentry, inode);  // 在这里应该是加入了目录了
 	return NULL;
 }
 EXPORT_SYMBOL(d_splice_alias);

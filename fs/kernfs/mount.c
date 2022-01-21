@@ -230,7 +230,7 @@ static int kernfs_fill_super(struct super_block *sb, unsigned long magic)
 	sb->s_blocksize = PAGE_SIZE;
 	sb->s_blocksize_bits = PAGE_SHIFT;
 	sb->s_magic = magic;
-	sb->s_op = &kernfs_sops;
+	sb->s_op = &kernfs_sops;  // 这个super_block的操作是什么？？ 有啥？？
 	sb->s_xattr = kernfs_xattr_handlers;
 	if (info->root->flags & KERNFS_ROOT_SUPPORT_EXPORTOP)
 		sb->s_export_op = &kernfs_export_ops;
@@ -238,7 +238,7 @@ static int kernfs_fill_super(struct super_block *sb, unsigned long magic)
 
 	/* get root inode, initialize and unlock it */
 	mutex_lock(&kernfs_mutex);
-	inode = kernfs_get_inode(sb, info->root->kn);
+	inode = kernfs_get_inode(sb, info->root->kn); // 关联inode与root kernfs_node
 	mutex_unlock(&kernfs_mutex);
 	if (!inode) {
 		pr_debug("kernfs: could not get root inode\n");
@@ -246,7 +246,7 @@ static int kernfs_fill_super(struct super_block *sb, unsigned long magic)
 	}
 
 	/* instantiate and link root dentry */
-	root = d_make_root(inode);
+	root = d_make_root(inode); //在这里把dentry和inode关联起来了
 	if (!root) {
 		pr_debug("%s: could not get root dentry!\n", __func__);
 		return -ENOMEM;
@@ -317,7 +317,7 @@ struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 	info->root = root;
 	info->ns = ns;
 	INIT_LIST_HEAD(&info->node);
-
+    // 这个获得 并且设置 superblock结构体的函数是通用的，传进去的 kernfs_test_super/kernfs_set_super 是不同文件系统不一样的。
 	sb = sget_userns(fs_type, kernfs_test_super, kernfs_set_super, flags,
 			 &init_user_ns, info);
 	if (IS_ERR(sb) || sb->s_fs_info != info)
@@ -328,10 +328,10 @@ struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 	if (new_sb_created)
 		*new_sb_created = !sb->s_root;
 
-	if (!sb->s_root) {
+	if (!sb->s_root) { // 如果为空，说明是新建的super_block
 		struct kernfs_super_info *info = kernfs_info(sb);
 
-		error = kernfs_fill_super(sb, magic);
+		error = kernfs_fill_super(sb, magic); // 继续填充super_block
 		if (error) {
 			deactivate_locked_super(sb);
 			return ERR_PTR(error);
@@ -339,7 +339,7 @@ struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 		sb->s_flags |= SB_ACTIVE;
 
 		mutex_lock(&kernfs_mutex);
-		list_add(&info->node, &root->supers);
+		list_add(&info->node, &root->supers); // 将当前kernfs 链到root->supers上。
 		mutex_unlock(&kernfs_mutex);
 	}
 

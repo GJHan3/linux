@@ -81,7 +81,7 @@ int register_filesystem(struct file_system_type * fs)
 	if (*p)
 		res = -EBUSY;
 	else
-		*p = fs;
+		*p = fs;    // 如果文件系统的名字已经存在链表之中了。 那么就不再添加，否则添加到文件系统中去。
 	write_unlock(&file_systems_lock);
 	return res;
 }

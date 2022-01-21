@@ -498,12 +498,12 @@ struct super_block *sget_userns(struct file_system_type *type,
 	    !capable(CAP_SYS_ADMIN))
 		return ERR_PTR(-EPERM);
 retry:
-	spin_lock(&sb_lock);
-	if (test) {
+	spin_lock(&sb_lock);  //全局的super_block锁
+	if (test) { // 遍历这个文件系统类型的所有superblock
 		hlist_for_each_entry(old, &type->fs_supers, s_instances) {
-			if (!test(old, data))
+			if (!test(old, data)) // 如果super_block不存在，继续搜索
 				continue;
-			if (user_ns != old->s_user_ns) {
+			if (user_ns != old->s_user_ns) {  // 接下来应该是一系列的判断了。暂时不深究
 				spin_unlock(&sb_lock);
 				destroy_unused_super(s);
 				return ERR_PTR(-EBUSY);
@@ -513,28 +513,28 @@ retry:
 			destroy_unused_super(s);
 			return old;
 		}
-	}
+	} // 走到这里，说明super_block不存在
 	if (!s) {
 		spin_unlock(&sb_lock);
 		s = alloc_super(type, (flags & ~SB_SUBMOUNT), user_ns);
 		if (!s)
 			return ERR_PTR(-ENOMEM);
-		goto retry;
+		goto retry;  // 为什么要retry呢？、 应该是这里没用大锁去申请的，所以尝试一遍。
 	}
-
+    // 继续往下走，设置super_block内容
 	err = set(s, data);
 	if (err) {
 		spin_unlock(&sb_lock);
 		destroy_unused_super(s);
 		return ERR_PTR(err);
 	}
-	s->s_type = type;
-	strlcpy(s->s_id, type->name, sizeof(s->s_id));
-	list_add_tail(&s->s_list, &super_blocks);
-	hlist_add_head(&s->s_instances, &type->fs_supers);
+	s->s_type = type; // 设置super_block的文件类型
+	strlcpy(s->s_id, type->name, sizeof(s->s_id)); // 设置super_block的名字
+	list_add_tail(&s->s_list, &super_blocks); // 将super_block添加到全局链表上
+	hlist_add_head(&s->s_instances, &type->fs_supers); // 将这个super_block添加到对应的文件系统类型链表上
 	spin_unlock(&sb_lock);
-	get_filesystem(type);
-	register_shrinker_prepared(&s->s_shrink);
+	get_filesystem(type); // 增加引用
+	register_shrinker_prepared(&s->s_shrink); // 这个是干啥的 ，暂时不清楚
 	return s;
 }
 
@@ -548,6 +548,7 @@ EXPORT_SYMBOL(sget_userns);
  *	@flags:	  mount flags
  *	@data:	  argument to each of them
  */
+// 查找或者创建一个超级块
 struct super_block *sget(struct file_system_type *type,
 			int (*test)(struct super_block *,void *),
 			int (*set)(struct super_block *,void *),
@@ -1022,7 +1023,7 @@ EXPORT_SYMBOL(free_anon_bdev);
 
 int set_anon_super(struct super_block *s, void *data)
 {
-	return get_anon_bdev(&s->s_dev);
+	return get_anon_bdev(&s->s_dev); // 取得了一个设备号
 }
 EXPORT_SYMBOL(set_anon_super);
 

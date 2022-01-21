@@ -31,7 +31,7 @@ struct mountpoint {
 	int m_count;
 };
 
-struct mount {
+v  {
 	struct hlist_node mnt_hash;
 	struct mount *mnt_parent;
 	struct dentry *mnt_mountpoint;

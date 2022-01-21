@@ -1093,14 +1093,14 @@ static struct dentry *kernfs_iop_lookup(struct inode *dir,
 	}
 
 	/* attach dentry and inode */
-	inode = kernfs_get_inode(dir->i_sb, kn);
+	inode = kernfs_get_inode(dir->i_sb, kn); // inode 和 kern_node关联
 	if (!inode) {
 		ret = ERR_PTR(-ENOMEM);
 		goto out_unlock;
 	}
 
 	/* instantiate and hash dentry */
-	ret = d_splice_alias(inode, dentry);
+	ret = d_splice_alias(inode, dentry);  //entry 和 inode 关联， 并且加入目录
  out_unlock:
 	mutex_unlock(&kernfs_mutex);
 	return ret;
