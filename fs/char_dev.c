@@ -400,7 +400,7 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 			inode->i_cdev = p = new;
 			list_add(&inode->i_devices, &p->list);
 			new = NULL;
-		} else if (!cdev_get(p))
+		} else if (!cdev_get(p))   // 通过设备号，找到对应的cdev结构体
 			ret = -ENXIO;
 	} else if (!cdev_get(p))
 		ret = -ENXIO;
@@ -414,7 +414,7 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 	if (!fops)
 		goto out_cdev_put;
 
-	replace_fops(filp, fops);
+	replace_fops(filp, fops); // 将operations赋值给filp
 	if (filp->f_op->open) {
 		ret = filp->f_op->open(inode, filp);
 		if (ret)

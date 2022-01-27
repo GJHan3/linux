@@ -467,7 +467,7 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	pr_debug("kobject: '%s' (%p): %s\n",
 		 kobject_name(kobj), kobj, __func__);
 
-	/* search the kset we belong to */
+	/* search the kset we belong to  搜索到最近的kset */ 
 	top_kobj = kobj;
 	while (!top_kobj->kset && top_kobj->parent)
 		top_kobj = top_kobj->parent;

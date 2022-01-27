@@ -58,7 +58,7 @@ static int sysfs_kf_seq_show(struct seq_file *sf, void *v)
 	 * if @ops->show() isn't implemented.
 	 */
 	if (ops->show) {
-		count = ops->show(kobj, of->kn->priv, buf);
+		count = ops->show(kobj, of->kn->priv, buf); // 在这里调用ktype的sysfs_ops
 		if (count < 0)
 			return count;
 	}
@@ -254,7 +254,7 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 
 	if (!is_bin) {
 		struct kobject *kobj = parent->priv;
-		const struct sysfs_ops *sysfs_ops = kobj->ktype->sysfs_ops;
+		const struct sysfs_ops *sysfs_ops = kobj->ktype->sysfs_ops; // 如果sysfs_ops存在的话， 就调用
 
 		/* every kobject with an attribute needs a ktype assigned */
 		if (WARN(!sysfs_ops, KERN_ERR

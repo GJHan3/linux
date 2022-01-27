@@ -355,7 +355,7 @@ static int kernfs_link_sibling(struct kernfs_node *kn)
 
 		pos = rb_to_kn(*node);
 		parent = *node;
-		result = kernfs_sd_compare(kn, pos);
+		result = kernfs_sd_compare(kn, pos); // 根据哈希添加
 		if (result < 0)
 			node = &pos->rb.rb_left;
 		else if (result > 0)

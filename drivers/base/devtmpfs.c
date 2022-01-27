@@ -80,6 +80,7 @@ static inline int is_blockdev(struct device *dev)
 static inline int is_blockdev(struct device *dev) { return 0; }
 #endif
 
+//创建dev node
 int devtmpfs_create_node(struct device *dev)
 {
 	const char *tmp = NULL;
@@ -193,6 +194,7 @@ static int create_path(const char *nodepath)
 	return err;
 }
 
+// 创建节点的函数
 static int handle_create(const char *nodename, umode_t mode, kuid_t uid,
 			 kgid_t gid, struct device *dev)
 {
@@ -383,6 +385,7 @@ static int devtmpfsd(void *p)
 	*err = ksys_unshare(CLONE_NEWNS);
 	if (*err)
 		goto out;
+    // 将devtmpfs挂载到/dev下
 	*err = ksys_mount("devtmpfs", "/", "devtmpfs", MS_SILENT, options);
 	if (*err)
 		goto out;

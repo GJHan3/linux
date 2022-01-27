@@ -141,7 +141,7 @@ struct kernfs_node {
 	struct kernfs_node	*parent;
 	const char		*name;
 
-	struct rb_node		rb; // 添加到红黑树上的。
+	struct rb_node		rb; // 添加到父目录的红黑树上的。
 
 	const void		*ns;	/* namespace tag */
 	unsigned int		hash;	/* ns + name hash */  // 哈希值
