@@ -69,7 +69,7 @@ int __init sysfs_init(void)
 
 	sysfs_root_kn = sysfs_root->kn;
 
-	err = register_filesystem(&sysfs_fs__type);
+	err = register_filesystem(&sysfs_fs_type);
 	if (err) {
 		kernfs_destroy_root(sysfs_root);
 		return err;
