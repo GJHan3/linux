@@ -306,8 +306,8 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
 
 		return 0;
 	}
-
-	init_iova_domain(iovad, 1UL << order, base_pfn);
+	pr_info("iov = 0x%llx, size = 0x%lx\n", iovad, 1UL << order);
+	init_iova_domain(iovad, 1UL << order, base_pfn); //初始化的时候，页面地址
 	if (!dev)
 		return 0;
 

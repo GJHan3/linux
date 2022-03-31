@@ -160,7 +160,7 @@ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
 				     unsigned long attrs)
 {
 	dma_addr_t dev_addr;
-
+    // 直接返回的应该是物理地址
 	dev_addr = swiotlb_map_page(dev, page, offset, size, dir, attrs);
 	if (!is_device_dma_coherent(dev) &&
 	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
@@ -835,20 +835,22 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 				  const struct iommu_ops *ops)
 {
 	struct iommu_domain *domain;
-
+    pr_info("----> __iommu_setup_dma_ops --> IOMMU_DOMAIN_DMA \n");
 	if (!ops)
 		return;
-
+	pr_info("----> __iommu_setup_dma_ops --> IOMMU_DOMAIN_DMA 1\n");
 	/*
 	 * The IOMMU core code allocates the default DMA domain, which the
 	 * underlying IOMMU driver needs to support via the dma-iommu layer.
 	 */
 	domain = iommu_get_domain_for_dev(dev);
-
+    // 这里是不是获得这个设备是不是属于某个domain 如果是的话就用这个domain, 应该是在dtb里面配置到iommu里面去
 	if (!domain)
 		goto out_err;
 
 	if (domain->type == IOMMU_DOMAIN_DMA) {
+        pr_info("----> IOMMU_DOMAIN_DMA, dma_base = 0x%llx, size = 0x%llx\n",
+				(uint64_t)dma_base, (uint64_t)size);
 		if (iommu_dma_init_domain(domain, dma_base, size, dev))
 			goto out_err;
 
@@ -875,11 +877,15 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 
 #endif  /* CONFIG_IOMMU_DMA */
 
+// dma_ops
 void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 			const struct iommu_ops *iommu, bool coherent)
 {
-	if (!dev->dma_ops)
+	if (!dev->dma_ops) {
+        // 如果没有设置dma_ops 则设置为arm64_swiotlb_dma_ops
 		dev->dma_ops = &arm64_swiotlb_dma_ops;
+        pr_info("------> dma ops set to arm64_swiotlb_dma_ops\n");
+    }
 
 	dev->archdata.dma_coherent = coherent;
 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);

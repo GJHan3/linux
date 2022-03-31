@@ -1013,10 +1013,10 @@ void pcibios_setup_bus_devices(struct pci_bus *bus)
 		/* Cardbus can call us to add new devices to a bus, so ignore
 		 * those who are already fully discovered
 		 */
-		if (pci_dev_is_added(dev))
+		if (pci_dev_is_added(dev)) //遍历这条总线上的设备，如果已经添加过了， 则忽略
 			continue;
 
-		pcibios_setup_device(dev);
+		pcibios_setup_device(dev);// 没有添加过的，设置对设备进行设置
 	}
 }
 

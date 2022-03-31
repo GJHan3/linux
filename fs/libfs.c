@@ -210,7 +210,7 @@ EXPORT_SYMBOL(dcache_readdir);
 
 ssize_t generic_read_dir(struct file *filp, char __user *buf, size_t siz, loff_t *ppos)
 {
-	return -EISDIR;
+	return -EISDIR; //返回是目录
 }
 EXPORT_SYMBOL(generic_read_dir);
 

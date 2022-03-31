@@ -102,7 +102,7 @@ EXPORT_SYMBOL_GPL(pci_hp_remove_devices);
  * is how this routine differs from other, similar pcibios
  * routines.)
  */
-void pci_hp_add_devices(struct pci_bus *bus)
+void pci_hp_add_devices(struct pci_bus *bus) //热插拔总线上的设备
 {
 	int slotno, mode, max;
 	struct pci_dev *dev;

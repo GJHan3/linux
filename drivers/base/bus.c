@@ -479,7 +479,7 @@ int bus_add_device(struct device *dev)
 
 	if (bus) {
 		pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
-		error = device_add_groups(dev, bus->dev_groups);
+		error = device_add_groups(dev, bus->dev_groups); //在这里添加所有的属性
 		if (error)
 			goto out_put;
 		error = sysfs_create_link(&bus->p->devices_kset->kobj,

@@ -759,7 +759,7 @@ arm_lpae_alloc_pgtable(struct io_pgtable_cfg *cfg)
 
 	data->iop.ops = (struct io_pgtable_ops) {
 		.map		= arm_lpae_map,
-		.unmap		= arm_lpae_unmap,
+		.unmap		= arm_lpae_unmap, // 页表的映射操作
 		.iova_to_phys	= arm_lpae_iova_to_phys,
 	};
 

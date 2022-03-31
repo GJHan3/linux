@@ -47,7 +47,7 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
 	if (fmt >= IO_PGTABLE_NUM_FMTS)
 		return NULL;
 
-	fns = io_pgtable_init_table[fmt];
+	fns = io_pgtable_init_table[fmt]; //分配页表
 	if (!fns)
 		return NULL;
 

@@ -414,7 +414,7 @@ static int pnv_php_set_attention_state(struct hotplug_slot *slot, u8 state)
 	return 0;
 }
 
-static int pnv_php_enable(struct pnv_php_slot *php_slot, bool rescan)
+static int pnv_php_enable(struct pnv_php_slot *php_slot, bool rescan) //热插拔处理
 {
 	struct hotplug_slot *slot = &php_slot->slot;
 	uint8_t presence = OPAL_PCI_SLOT_EMPTY;
@@ -484,7 +484,7 @@ scan:
 	if (presence == OPAL_PCI_SLOT_PRESENT) {
 		if (rescan) {
 			pci_lock_rescan_remove();
-			pci_hp_add_devices(php_slot->bus);
+			pci_hp_add_devices(php_slot->bus); // 热插拔重新扫描设备， 现在扫描的是这条bus上的设备
 			pci_unlock_rescan_remove();
 		}
 
@@ -504,7 +504,7 @@ static int pnv_php_enable_slot(struct hotplug_slot *slot)
 	struct pnv_php_slot *php_slot = container_of(slot,
 						     struct pnv_php_slot, slot);
 
-	return pnv_php_enable(php_slot, true);
+	return pnv_php_enable(php_slot, true); //使能slot
 }
 
 static int pnv_php_disable_slot(struct hotplug_slot *slot)
@@ -667,7 +667,7 @@ static int pnv_php_enable_msix(struct pnv_php_slot *php_slot)
 
 	/* Check hotplug MSIx entry is in range */
 	pcie_capability_read_word(pdev, PCI_EXP_FLAGS, &pcie_flag);
-	entry.entry = (pcie_flag & PCI_EXP_FLAGS_IRQ) >> 9;
+	entry.entry = (pcie_flag & PCI_EXP_FLAGS_IRQ) >> 9; // 热插拔中断
 	if (entry.entry >= nr_entries)
 		return -ERANGE;
 
@@ -688,7 +688,7 @@ static void pnv_php_event_handler(struct work_struct *work)
 	struct pnv_php_slot *php_slot = event->php_slot;
 
 	if (event->added)
-		pnv_php_enable_slot(&php_slot->slot);
+		pnv_php_enable_slot(&php_slot->slot); // 使能这个slot
 	else
 		pnv_php_disable_slot(&php_slot->slot);
 
@@ -755,7 +755,7 @@ static irqreturn_t pnv_php_interrupt(int irq, void *data)
 
 	pci_info(pdev, "PCI slot [%s] %s (IRQ: %d)\n",
 		 php_slot->name, added ? "added" : "removed", irq);
-	INIT_WORK(&event->work, pnv_php_event_handler);
+	INIT_WORK(&event->work, pnv_php_event_handler); // 热插拔中断的中断下半部
 	event->added = added;
 	event->php_slot = php_slot;
 	queue_work(php_slot->wq, &event->work);
@@ -793,7 +793,7 @@ static void pnv_php_init_irq(struct pnv_php_slot *php_slot, int irq)
 	pcie_capability_write_word(pdev, PCI_EXP_SLTSTA, sts);
 
 	/* Request the interrupt */
-	ret = request_irq(irq, pnv_php_interrupt, IRQF_SHARED,
+	ret = request_irq(irq, pnv_php_interrupt, IRQF_SHARED, //注册热插拔中断
 			  php_slot->name, php_slot);
 	if (ret) {
 		pnv_php_disable_irq(php_slot, true);

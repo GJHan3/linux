@@ -424,7 +424,8 @@ static void vmd_teardown_dma_ops(struct vmd_dev *vmd)
 		if (source->fn)			\
 			dest->fn = vmd_##fn;	\
 	} while (0)
-
+	
+//设置dma 操作
 static void vmd_setup_dma_ops(struct vmd_dev *vmd)
 {
 	const struct dma_map_ops *source = get_dma_ops(&vmd->dev->dev);

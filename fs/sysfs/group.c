@@ -49,7 +49,7 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
 			 */
 			if (update)
 				kernfs_remove_by_name(parent, (*attr)->name);
-			if (grp->is_visible) {
+			if (grp->is_visible) { //这里可以设置是否可见, 这里的obj是device里面的
 				mode = grp->is_visible(kobj, *attr, i);
 				if (!mode)
 					continue;

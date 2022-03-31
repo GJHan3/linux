@@ -831,7 +831,7 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 
 	p = find_process_by_mm(mm);
 	if (p)
-		kref_get(&p->ref);
+		kref_get(&p->ref); // 将最后的释放放在rcu里面。
 
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 

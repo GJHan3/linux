@@ -253,7 +253,7 @@ struct dentry *proc_lookup_de(struct inode *dir, struct dentry *dentry,
 	if (de) {
 		pde_get(de);
 		read_unlock(&proc_subdir_lock);
-		inode = proc_get_inode(dir->i_sb, de);
+		inode = proc_get_inode(dir->i_sb, de); //创建inode
 		if (!inode)
 			return ERR_PTR(-ENOMEM);
 		d_set_d_op(dentry, &proc_misc_dentry_ops);
@@ -305,7 +305,7 @@ int proc_readdir_de(struct file *file, struct dir_context *ctx,
 		pde_get(de);
 		read_unlock(&proc_subdir_lock);
 		if (!dir_emit(ctx, de->name, de->namelen,
-			    de->low_ino, de->mode >> 12)) {
+			    de->low_ino, de->mode >> 12)) { // readdir.c中，各个读取目录的系统调用有ctx->actor =来赋值
 			pde_put(de);
 			return 0;
 		}

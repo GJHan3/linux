@@ -29,7 +29,7 @@ static void seq_set_overflow(struct seq_file *m)
 
 static void *seq_buf_alloc(unsigned long size)
 {
-	return kvmalloc(size, GFP_KERNEL_ACCOUNT);
+	return kvmalloc(size, GFP_KERNEL_ACCOUNT); //采用的是vmalloc
 }
 
 /**
@@ -221,18 +221,18 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 	}
 	/* we need at least one record in buffer */
 	m->from = 0;
-	p = m->op->start(m, &m->index);
+	p = m->op->start(m, &m->index);	//可以在开始的时候做点事情， index是文件的位置，返回值表示什么？？返回值是show的入参数
 	while (1) {
 		err = PTR_ERR(p);
 		if (!p || IS_ERR(p))
 			break;
-		err = m->op->show(m, p);
+		err = m->op->show(m, p); //在show里面用标准的seq的输入输出函数
 		if (err < 0)
 			break;
 		if (unlikely(err))
 			m->count = 0;
 		if (unlikely(!m->count)) {
-			p = m->op->next(m, p, &m->index);
+			p = m->op->next(m, p, &m->index); 
 			continue;
 		}
 		if (m->count < m->size)
@@ -240,8 +240,8 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 		m->op->stop(m, p);
 		kvfree(m->buf);
 		m->count = 0;
-		m->buf = seq_buf_alloc(m->size <<= 1);
-		if (!m->buf)
+		m->buf = seq_buf_alloc(m->size <<= 1); // 只读一次， 如果不够的话继续扩大buffer去读， 只扩大一次， 能装多少是多少。 最后受限于用户态给了多大的空间
+		if (!m->buf)							// 如果这一次用户没读完，下次用户可以继续在这个buffer上读
 			goto Enomem;
 		m->version = 0;
 		p = m->op->start(m, &m->index);
@@ -250,7 +250,7 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 	m->count = 0;
 	goto Done;
 Fill:
-	/* they want more? let's try to get some more */
+	/* they want more? let's try to get some more */ // 读了一次，如果能装下 继续装。
 	while (1) {
 		size_t offs = m->count;
 		loff_t pos = m->index;
@@ -281,7 +281,7 @@ Fill:
 	m->count -= n;
 	m->from = n;
 Done:
-	if (!copied)
+	if (!copied) //如果拷贝是0， 那么就把拷贝变成错误，如果错误是0，那代表拷完了？？
 		copied = err;
 	else {
 		*ppos += copied;

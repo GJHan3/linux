@@ -541,7 +541,7 @@ int cdev_device_add(struct cdev *cdev, struct device *dev)
 	int rc = 0;
 
 	if (dev->devt) {
-		cdev_set_parent(cdev, &dev->kobj);
+		cdev_set_parent(cdev, &dev->kobj); //在这里的时候，创建设备就把cdev和dev关联起来了
 
 		rc = cdev_add(cdev, dev->devt, 1);
 		if (rc)
@@ -606,7 +606,7 @@ static void cdev_default_release(struct kobject *kobj)
 	struct kobject *parent = kobj->parent;
 
 	cdev_purge(p);
-	kobject_put(parent);
+	kobject_put(parent); // 释放device的引用
 }
 
 static void cdev_dynamic_release(struct kobject *kobj)
@@ -654,7 +654,7 @@ void cdev_init(struct cdev *cdev, const struct file_operations *fops)
 {
 	memset(cdev, 0, sizeof *cdev);
 	INIT_LIST_HEAD(&cdev->list);
-	kobject_init(&cdev->kobj, &ktype_cdev_default);
+	kobject_init(&cdev->kobj, &ktype_cdev_default); // cdev最后释放的时候调用这个
 	cdev->ops = fops;
 }
 

@@ -86,6 +86,7 @@ int proc_remount(struct super_block *sb, int *flags, char *data)
 	return !proc_parse_options(data, pid);
 }
 
+//挂在procfs 文件系统
 static struct dentry *proc_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
@@ -154,7 +155,7 @@ static int proc_root_getattr(const struct path *path, struct kstat *stat,
 
 static struct dentry *proc_root_lookup(struct inode * dir, struct dentry * dentry, unsigned int flags)
 {
-	if (!proc_pid_lookup(dir, dentry, flags))
+	if (!proc_pid_lookup(dir, dentry, flags)) //查找和pid相关的选
 		return NULL;
 	
 	return proc_lookup(dir, dentry, flags);
@@ -169,7 +170,7 @@ static int proc_root_readdir(struct file *file, struct dir_context *ctx)
 		ctx->pos = FIRST_PROCESS_ENTRY;
 	}
 
-	return proc_pid_readdir(file, ctx);
+	return proc_pid_readdir(file, ctx); //和pid相关的遍历
 }
 
 /*
@@ -178,8 +179,8 @@ static int proc_root_readdir(struct file *file, struct dir_context *ctx)
  * directory handling functions for that..
  */
 static const struct file_operations proc_root_operations = {
-	.read		 = generic_read_dir,
-	.iterate_shared	 = proc_root_readdir,
+	.read		 = generic_read_dir, //读了读话 返回错误 是一个目录
+	.iterate_shared	 = proc_root_readdir, //在这里调用了读目录
 	.llseek		= generic_file_llseek,
 };
 

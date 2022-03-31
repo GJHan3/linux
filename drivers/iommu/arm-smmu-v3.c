@@ -1461,7 +1461,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
 	 * We can't really do anything meaningful until we've added a
 	 * master.
 	 */
-	smmu_domain = kzalloc(sizeof(*smmu_domain), GFP_KERNEL);
+	smmu_domain = kzalloc(sizeof(*smmu_domain), GFP_KERNEL); //申请了一个smmu_domain, 其中 包含一个domain
 	if (!smmu_domain)
 		return NULL;
 
@@ -1624,7 +1624,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
 
-	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain); //申请io page table
 	if (!pgtbl_ops)
 		return -ENOMEM;
 
@@ -1693,6 +1693,7 @@ static void arm_smmu_detach_dev(struct device *dev)
 	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
 }
 
+//重点函数
 static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 {
 	int ret = 0;
@@ -1715,8 +1716,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	mutex_lock(&smmu_domain->init_mutex);
 
 	if (!smmu_domain->smmu) {
+		pr_info("arm_smmu_attach_dev --- 1\n");
 		smmu_domain->smmu = smmu;
-		ret = arm_smmu_domain_finalise(domain);
+		ret = arm_smmu_domain_finalise(domain); //绑定设备的时候， 申请一个page table
 		if (ret) {
 			smmu_domain->smmu = NULL;
 			goto out_unlock;
@@ -1731,20 +1733,23 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 	ste->assigned = true;
-
+	pr_info("arm_smmu_attach_dev --- 2\n");
 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
+		pr_info("arm_smmu_attach_dev --- 3\n");
 		ste->s1_cfg = NULL;
 		ste->s2_cfg = NULL;
 	} else if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+		pr_info("arm_smmu_attach_dev --- 4\n");
 		ste->s1_cfg = &smmu_domain->s1_cfg;
 		ste->s2_cfg = NULL;
 		arm_smmu_write_ctx_desc(smmu, ste->s1_cfg);
 	} else {
+		pr_info("arm_smmu_attach_dev --- 4\n");
 		ste->s1_cfg = NULL;
 		ste->s2_cfg = &smmu_domain->s2_cfg;
 	}
-
-	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+	pr_info("arm_smmu_attach_dev --- 6\n");
+	arm_smmu_install_ste_for_dev(dev->iommu_fwspec); //注册ste到smmu中去
 out_unlock:
 	mutex_unlock(&smmu_domain->init_mutex);
 	return ret;
@@ -1754,7 +1759,8 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
 			phys_addr_t paddr, size_t size, int prot)
 {
 	struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
-
+	pr_info("\n\n -------arm_smmu_map -------, paddr = 0x%llx, size = 0x%llx\n\n",
+			(uint64_t)paddr, (uint64_t)size);
 	if (!ops)
 		return -ENODEV;
 
@@ -1905,7 +1911,7 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
 	 * impractical given a potential sparse 32-bit stream ID space.
 	 */
 	if (dev_is_pci(dev))
-		group = pci_device_group(dev);
+		group = pci_device_group(dev); // pci设备的group中 domain有一张表， alias的设备都是用这张表
 	else
 		group = generic_device_group(dev);
 
@@ -2789,7 +2795,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	struct arm_smmu_device *smmu;
 	struct device *dev = &pdev->dev;
 	bool bypass;
-
+    // while(1);
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
 		dev_err(dev, "failed to allocate arm_smmu_device\n");
@@ -2862,16 +2868,17 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	iommu_device_set_ops(&smmu->iommu, &arm_smmu_ops);
-	iommu_device_set_fwnode(&smmu->iommu, dev->fwnode);
+	iommu_device_set_ops(&smmu->iommu, &arm_smmu_ops); // 设置arm_smmu_ops
+	iommu_device_set_fwnode(&smmu->iommu, dev->fwnode); // 设置iommu的fwnode
 
-	ret = iommu_device_register(&smmu->iommu);
+	ret = iommu_device_register(&smmu->iommu); //注册到iommu上去了
 	if (ret) {
 		dev_err(dev, "Failed to register iommu\n");
 		return ret;
 	}
 
 #ifdef CONFIG_PCI
+    // PCI设置 SMMU
 	if (pci_bus_type.iommu_ops != &arm_smmu_ops) {
 		pci_request_acs();
 		ret = bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
@@ -2891,6 +2898,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 		if (ret)
 			return ret;
 	}
+    pr_info("SMMUv3 Probe Done.\n");
 	return 0;
 }
 

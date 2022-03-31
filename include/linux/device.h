@@ -551,13 +551,13 @@ extern void class_destroy(struct class *cls);
  */
 struct device_type {
 	const char *name;
-	const struct attribute_group **groups;
-	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
-	char *(*devnode)(struct device *dev, umode_t *mode,
+	const struct attribute_group **groups;	//设定了device的属性
+	int (*uevent)(struct device *dev, struct kobj_uevent_env *env); //这个应该是接收uevent用的
+	char *(*devnode)(struct device *dev, umode_t *mode, //这个是创建devnode用的。 
 			 kuid_t *uid, kgid_t *gid);
-	void (*release)(struct device *dev);
+	void (*release)(struct device *dev); //释放设备用的
 
-	const struct dev_pm_ops *pm;
+	const struct dev_pm_ops *pm;	//操作设备的电源的call_back函数
 };
 
 /* interface for exporting device attributes */
@@ -1029,7 +1029,7 @@ static inline struct device *kobj_to_dev(struct kobject *kobj)
 static inline const char *dev_name(const struct device *dev)
 {
 	/* Use the init name until the kobject becomes available */
-	if (dev->init_name)
+	if (dev->init_name) //设备的名字
 		return dev->init_name;
 
 	return kobject_name(&dev->kobj);

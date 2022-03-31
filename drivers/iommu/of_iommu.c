@@ -102,7 +102,7 @@ static int of_iommu_xlate(struct device *dev,
 	struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
 	int err;
 
-	ops = iommu_ops_from_fwnode(fwnode);
+	ops = iommu_ops_from_fwnode(fwnode); //通过 of来使用iommu
 	if ((ops && !ops->of_xlate) ||
 	    !of_device_is_available(iommu_spec->np))
 		return NO_IOMMU;
@@ -170,10 +170,10 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
 		struct of_pci_iommu_alias_info info = {
 			.dev = dev,
 			.np = master_np,
-		};
+		}; //pci设备
 
 		err = pci_for_each_dma_alias(to_pci_dev(dev),
-					     of_pci_iommu_init, &info);
+					     of_pci_iommu_init, &info); //对设备的每一个alias 进行配置
 	} else {
 		struct of_phandle_args iommu_spec;
 		int idx = 0;

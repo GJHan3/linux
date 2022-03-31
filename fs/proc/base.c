@@ -3123,7 +3123,7 @@ static struct dentry *proc_pid_instantiate(struct dentry * dentry,
 				   struct task_struct *task, const void *ptr)
 {
 	struct inode *inode;
-
+	//	创建pid的procfs
 	inode = proc_pid_make_inode(dentry->d_sb, task, S_IFDIR | S_IRUGO | S_IXUGO);
 	if (!inode)
 		return ERR_PTR(-ENOENT);
@@ -3216,7 +3216,7 @@ int proc_pid_readdir(struct file *file, struct dir_context *ctx)
 	struct tgid_iter iter;
 	struct pid_namespace *ns = proc_pid_ns(file_inode(file));
 	loff_t pos = ctx->pos;
-
+	// pr_info("----> tgid start \n");
 	if (pos >= PID_MAX_LIMIT + TGID_OFFSET)
 		return 0;
 
@@ -3245,6 +3245,7 @@ int proc_pid_readdir(struct file *file, struct dir_context *ctx)
 			continue;
 
 		len = snprintf(name, sizeof(name), "%u", iter.tgid);
+		// pr_info("----> tgid = %d\n", iter.tgid);
 		ctx->pos = iter.tgid + TGID_OFFSET;
 		if (!proc_fill_cache(file, ctx, name, len,
 				     proc_pid_instantiate, iter.task, NULL)) {

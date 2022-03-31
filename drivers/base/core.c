@@ -915,7 +915,7 @@ static void device_get_ownership(struct kobject *kobj, kuid_t *uid, kgid_t *gid)
 		dev->class->get_ownership(dev, uid, gid);
 }
 
-static struct kobj_type device_ktype = {
+static struct kobj_type device_ktype = { //为什么kobj？ 可以用引用计数， 也可以用来创建目录用
 	.release	= device_release,
 	.sysfs_ops	= &dev_sysfs_ops,
 	.namespace	= device_namespace,
@@ -1907,7 +1907,7 @@ int device_add(struct device *dev)
 		goto DPMError;
 	device_pm_add(dev);
 
-	if (MAJOR(dev->devt)) {
+	if (MAJOR(dev->devt)) { //分配了dev号才会创建device
 		error = device_create_file(dev, &dev_attr_dev);
 		if (error)
 			goto DevAttrError;
@@ -2114,7 +2114,7 @@ void device_unregister(struct device *dev)
 {
 	pr_debug("device: '%s': %s\n", dev_name(dev), __func__);
 	device_del(dev);
-	put_device(dev);
+	put_device(dev); // 这里也释放了，在释放完目录释放的。
 }
 EXPORT_SYMBOL_GPL(device_unregister);
 
@@ -2165,7 +2165,7 @@ const char *device_get_devnode(struct device *dev,
 
 	*tmp = NULL;
 
-	/* the device type may provide a specific name */
+	/* the device type may provide a specific name */ //在设置创建dev节点的路径， 用以指导在/dev下生成相应的设备
 	if (dev->type && dev->type->devnode)
 		*tmp = dev->type->devnode(dev, mode, uid, gid);
 	if (*tmp)
@@ -2178,7 +2178,7 @@ const char *device_get_devnode(struct device *dev,
 		return *tmp;
 
 	/* return name without allocation, tmp == NULL */
-	if (strchr(dev_name(dev), '!') == NULL)
+	if (strchr(dev_name(dev), '!') == NULL) // 如果没有‘！’ ， 就直接用设备名称
 		return dev_name(dev);
 
 	/* replace '!' in the name with '/' */
@@ -2671,7 +2671,7 @@ void device_destroy(struct class *class, dev_t devt)
 
 	dev = class_find_device(class, NULL, &devt, __match_devt);
 	if (dev) {
-		put_device(dev);
+		put_device(dev); //设备在这里可能没有释放，但是目录文件已经被释放了， 在所有的ref释放的时候，调用ktype->release dev->release
 		device_unregister(dev);
 	}
 }

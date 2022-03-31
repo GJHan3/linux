@@ -438,7 +438,7 @@ static int proc_scsi_open(struct inode *inode, struct file *file)
 	 * We don't really need this for the write case but it doesn't
 	 * harm either.
 	 */
-	return seq_open(file, &scsi_seq_ops);
+	return seq_open(file, &scsi_seq_ops); //file->private = seq
 }
 
 static const struct file_operations proc_scsi_operations = {

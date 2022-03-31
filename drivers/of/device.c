@@ -94,8 +94,9 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
 	unsigned long offset;
 	const struct iommu_ops *iommu;
 	u64 mask;
-
+    // 获得dma地址
 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+	pr_info("dma_addr=0x%llx, paddr=0x%llx, size=0x%llx\n", dma_addr, paddr, size);
 	if (ret < 0) {
 		/*
 		 * For legacy reasons, we have to assume some devices need
@@ -132,7 +133,7 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
 	 * now, we'll continue the legacy behaviour of coercing it to the
 	 * coherent mask if not, but we'll no longer do so quietly.
 	 */
-	if (!dev->dma_mask) {
+	if (!dev->dma_mask) { // 设置dma mask
 		dev_warn(dev, "DMA mask not set\n");
 		dev->dma_mask = &dev->coherent_dma_mask;
 	}
@@ -154,6 +155,11 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
 	*dev->dma_mask &= mask;
 
 	coherent = of_dma_is_coherent(np);
+	if (coherent)
+		pr_info("dma coherent\n");
+	else 
+		pr_info("dma is not coherent\n");
+
 	dev_dbg(dev, "device is%sdma coherent\n",
 		coherent ? " " : " not ");
 
@@ -163,7 +169,7 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
 
 	dev_dbg(dev, "device is%sbehind an iommu\n",
 		iommu ? " " : " not ");
-
+	pr_info("----> dma_addr=0x%llx, paddr=0x%llx, size=0x%llx\n", dma_addr, paddr, size);
 	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
 
 	return 0;

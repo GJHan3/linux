@@ -55,14 +55,14 @@ static inline void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn)
  *
  * Iterate over all valid NumVFs, validate offset and stride, and calculate
  * the maximum number of bus numbers that could ever be required.
- */
+ */ //计算还需要多少bus号
 static int compute_max_vf_buses(struct pci_dev *dev)
 {
 	struct pci_sriov *iov = dev->sriov;
 	int nr_virtfn, busnr, rc = 0;
 
 	for (nr_virtfn = iov->total_VFs; nr_virtfn; nr_virtfn--) {
-		pci_iov_set_numvfs(dev, nr_virtfn);
+		pci_iov_set_numvfs(dev, nr_virtfn); 
 		if (!iov->offset || (nr_virtfn > 1 && !iov->stride)) {
 			rc = -EIO;
 			goto out;
@@ -393,6 +393,7 @@ static void sriov_disable(struct pci_dev *dev)
 	pci_iov_set_numvfs(dev, 0);
 }
 
+//SRIOV的初始化
 static int sriov_init(struct pci_dev *dev, int pos)
 {
 	int i, bar64;
@@ -416,7 +417,7 @@ static int sriov_init(struct pci_dev *dev, int pos)
 			goto found;
 
 	pdev = NULL;
-	if (pci_ari_enabled(dev->bus))
+	if (pci_ari_enabled(dev->bus)) //他的bus sriov使能了。
 		ctrl |= PCI_SRIOV_CTRL_ARI;
 
 found:

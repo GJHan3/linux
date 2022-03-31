@@ -82,13 +82,13 @@ int pci_domains_supported = 1;
 unsigned long pci_cardbus_io_size = DEFAULT_CARDBUS_IO_SIZE;
 unsigned long pci_cardbus_mem_size = DEFAULT_CARDBUS_MEM_SIZE;
 
-#define DEFAULT_HOTPLUG_IO_SIZE		(256)
-#define DEFAULT_HOTPLUG_MEM_SIZE	(2*1024*1024)
+#define DEFAULT_HOTPLUG_IO_SIZE		(256) // 默认IO 256Byte
+#define DEFAULT_HOTPLUG_MEM_SIZE	(2*1024*1024) // 默认内存2M？
 /* pci=hpmemsize=nnM,hpiosize=nn can override this */
 unsigned long pci_hotplug_io_size  = DEFAULT_HOTPLUG_IO_SIZE;
 unsigned long pci_hotplug_mem_size = DEFAULT_HOTPLUG_MEM_SIZE;
 
-#define DEFAULT_HOTPLUG_BUS_SIZE	1
+#define DEFAULT_HOTPLUG_BUS_SIZE	1 //默认预留一条bus
 unsigned long pci_hotplug_bus_size = DEFAULT_HOTPLUG_BUS_SIZE;
 
 enum pcie_bus_config_types pcie_bus_config = PCIE_BUS_DEFAULT;
@@ -5702,7 +5702,7 @@ void pci_add_dma_alias(struct pci_dev *dev, u8 devfn)
 {
 	if (!dev->dma_alias_mask)
 		dev->dma_alias_mask = kcalloc(BITS_TO_LONGS(U8_MAX),
-					      sizeof(long), GFP_KERNEL);
+					      sizeof(long), GFP_KERNEL); //这里申请了256位的mask
 	if (!dev->dma_alias_mask) {
 		pci_warn(dev, "Unable to allocate DMA alias mask\n");
 		return;
@@ -5710,7 +5710,7 @@ void pci_add_dma_alias(struct pci_dev *dev, u8 devfn)
 
 	set_bit(devfn, dev->dma_alias_mask);
 	pci_info(dev, "Enabling fixed DMA alias to %02x.%d\n",
-		 PCI_SLOT(devfn), PCI_FUNC(devfn));
+		 PCI_SLOT(devfn), PCI_FUNC(devfn)); //这里应该是对同一条bus下的devfunc
 }
 
 bool pci_devs_are_dma_aliases(struct pci_dev *dev1, struct pci_dev *dev2)

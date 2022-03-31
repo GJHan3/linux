@@ -177,6 +177,7 @@ static inline unsigned long decode_bar(struct pci_dev *dev, u32 bar)
  *
  * Returns 1 if the BAR is 64-bit, or 0 if 32-bit.
  */
+/* 重要， 在这里读bar size的大小， 以及读基地址， 加上host brige的偏移后 写到res->start */
 int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		    struct resource *res, unsigned int pos)
 {
@@ -288,7 +289,7 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	region.start = l64;
 	region.end = l64 + sz64;
 
-	pcibios_bus_to_resource(dev->bus, res, &region);
+	pcibios_bus_to_resource(dev->bus, res, &region); //这里写res->start
 	pcibios_resource_to_bus(dev->bus, &inverted_region, res);
 
 	/*
@@ -1585,7 +1586,7 @@ int pci_setup_device(struct pci_dev *dev)
 
 	dev->sysdata = dev->bus->sysdata;
 	dev->dev.parent = dev->bus->bridge;
-	dev->dev.bus = &pci_bus_type;
+	dev->dev.bus = &pci_bus_type; //通过这里 可以到iommu_ops
 	dev->hdr_type = hdr_type & 0x7f;
 	dev->multifunction = !!(hdr_type & 0x80);
 	dev->error_state = pci_channel_io_normal;
@@ -2319,7 +2320,7 @@ static void pci_init_capabilities(struct pci_dev *dev)
 	pci_configure_ari(dev);
 
 	/* Single Root I/O Virtualization */
-	pci_iov_init(dev);
+	pci_iov_init(dev); //初始化I/O virtualization
 
 	/* Address Translation Services */
 	pci_ats_init(dev);

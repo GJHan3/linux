@@ -1594,14 +1594,15 @@ static int pci_dma_configure(struct device *dev)
 	int ret = 0;
 
 	bridge = pci_get_host_bridge_device(to_pci_dev(dev));
-
+	pr_info("------------------->!!!pci_dma_configure ENTER\n");
 	if (IS_ENABLED(CONFIG_OF) && bridge->parent &&
 	    bridge->parent->of_node) {
-		ret = of_dma_configure(dev, bridge->parent->of_node, true);
+		pr_info("------------------->!!!pci_dma_configure OF\n");
+		ret = of_dma_configure(dev, bridge->parent->of_node, true); //platform device
 	} else if (has_acpi_companion(bridge)) {
 		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
 		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
-
+		pr_info("------------------->!!!pci_dma_configure ACPI\n");
 		if (attr != DEV_DMA_NOT_SUPPORTED)
 			ret = acpi_dma_configure(dev, attr);
 	}

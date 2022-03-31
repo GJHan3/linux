@@ -2026,7 +2026,7 @@ int amdgpu_atombios_init(struct amdgpu_device *adev)
 	atom_card_info->mc_write = cail_mc_write;
 	atom_card_info->pll_read = cail_pll_read;
 	atom_card_info->pll_write = cail_pll_write;
-
+    
 	adev->mode_info.atom_context = amdgpu_atom_parse(atom_card_info, adev->bios);
 	if (!adev->mode_info.atom_context) {
 		amdgpu_atombios_fini(adev);

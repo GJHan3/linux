@@ -45,7 +45,7 @@ int pci_for_each_dma_alias(struct pci_dev *pdev,
 		u8 devfn;
 
 		for_each_set_bit(devfn, pdev->dma_alias_mask, U8_MAX) {
-			ret = fn(pdev, PCI_DEVID(pdev->bus->number, devfn),
+			ret = fn(pdev, PCI_DEVID(pdev->bus->number, devfn), //对设备进行调用函数，进行枚举
 				 data);
 			if (ret)
 				return ret;

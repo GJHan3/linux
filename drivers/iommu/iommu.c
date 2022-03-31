@@ -95,7 +95,7 @@ static DEFINE_SPINLOCK(iommu_device_lock);
 int iommu_device_register(struct iommu_device *iommu)
 {
 	spin_lock(&iommu_device_lock);
-	list_add_tail(&iommu->list, &iommu_device_list);
+	list_add_tail(&iommu->list, &iommu_device_list); //添加到iommu上去了
 	spin_unlock(&iommu_device_lock);
 
 	return 0;
@@ -572,6 +572,7 @@ out:
 	return ret;
 }
 
+// iommu_group 貌似是一个管理的结构， 所有这里面的device如果发生什么事情，可以发生什么统一的动作
 /**
  * iommu_group_add_device - add a device to an iommu group
  * @group: the group into which to add the device (reference should be held)
@@ -877,7 +878,7 @@ static struct iommu_group *get_pci_function_alias_group(struct pci_dev *pdev,
 		group = get_pci_alias_group(tmp, devfns);
 		if (group) {
 			pci_dev_put(tmp);
-			return group;
+			return group; 
 		}
 	}
 
@@ -957,6 +958,7 @@ struct iommu_group *generic_device_group(struct device *dev)
 	return iommu_group_alloc();
 }
 
+// 如何给PCI设备分配GROUP
 /*
  * Use standard PCI bus topology, isolation features, and DMA alias quirks
  * to find or create an IOMMU group for a device.
@@ -969,7 +971,7 @@ struct iommu_group *pci_device_group(struct device *dev)
 	struct iommu_group *group = NULL;
 	u64 devfns[4] = { 0 };
 
-	if (WARN_ON(!dev_is_pci(dev)))
+	if (WARN_ON(!dev_is_pci(dev))) // 如果设备不是PCI设备 直接返回
 		return ERR_PTR(-EINVAL);
 
 	/*
@@ -977,7 +979,7 @@ struct iommu_group *pci_device_group(struct device *dev)
 	 * be aliased due to topology in order to have its own IOMMU group.
 	 * If we find an alias along the way that already belongs to a
 	 * group, use it.
-	 */
+	 */ //DMA requst id，一致，则用一致里面的一个分组
 	if (pci_for_each_dma_alias(pdev, get_pci_alias_or_group, &data))
 		return data.group;
 
@@ -994,11 +996,11 @@ struct iommu_group *pci_device_group(struct device *dev)
 			continue;
 
 		if (pci_acs_path_enabled(bus->self, NULL, REQ_ACS_FLAGS))
-			break;
+			break; //遍历路径上的设备，如果都开了，则返回true， 否则返回false
 
 		pdev = bus->self;
 
-		group = iommu_group_get(&pdev->dev);
+		group = iommu_group_get(&pdev->dev); //如果他有group，则和他一个group
 		if (group)
 			return group;
 	}
@@ -1328,7 +1330,7 @@ static int __iommu_attach_device(struct iommu_domain *domain,
 	if (unlikely(domain->ops->attach_dev == NULL))
 		return -ENODEV;
 
-	ret = domain->ops->attach_dev(domain, dev);
+	ret = domain->ops->attach_dev(domain, dev); //domain attach_dev
 	if (!ret)
 		trace_attach_device_to_domain(dev);
 	return ret;
@@ -1407,7 +1409,7 @@ struct iommu_domain *iommu_get_domain_for_dev(struct device *dev)
 	if (!group)
 		return NULL;
 
-	domain = group->domain;
+	domain = group->domain; //每个group只有一个domain
 
 	iommu_group_put(group);
 
@@ -1429,7 +1431,7 @@ static int iommu_group_do_attach_device(struct device *dev, void *data)
 {
 	struct iommu_domain *domain = data;
 
-	return __iommu_attach_device(domain, dev);
+	return __iommu_attach_device(domain, dev); // 
 }
 
 static int __iommu_attach_group(struct iommu_domain *domain,
@@ -1441,7 +1443,7 @@ static int __iommu_attach_group(struct iommu_domain *domain,
 		return -EBUSY;
 
 	ret = __iommu_group_for_each_dev(group, domain,
-					 iommu_group_do_attach_device);
+					 iommu_group_do_attach_device); //对于group下的device 都添加到domain上
 	if (ret == 0)
 		group->domain = domain;
 
@@ -1579,7 +1581,7 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 
 		pr_debug("mapping: iova 0x%lx pa %pa pgsize 0x%zx\n",
 			 iova, &paddr, pgsize);
-
+		// 调用smmu的map函数
 		ret = domain->ops->map(domain, iova, paddr, pgsize, prot);
 		if (ret)
 			break;
@@ -1948,7 +1950,7 @@ const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode)
 	struct iommu_device *iommu;
 
 	spin_lock(&iommu_device_lock);
-	list_for_each_entry(iommu, &iommu_device_list, list)
+	list_for_each_entry(iommu, &iommu_device_list, list) //通过fwnode来判断是用哪个smmu
 		if (iommu->fwnode == fwnode) {
 			ops = iommu->ops;
 			break;

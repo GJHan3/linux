@@ -998,7 +998,7 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 
 	/* If it has an init func, it must have an exit func to unload */
 	if (mod->init && !mod->exit) {
-		forced = try_force_unload(flags);
+		forced = try_force_unload(flags); //是否强制删除
 		if (!forced) {
 			/* This module can't be removed */
 			ret = -EBUSY;
@@ -1007,7 +1007,7 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 	}
 
 	/* Stop the machine so refcounts can't move and disable module. */
-	ret = try_stop_module(mod, flags, &forced);
+	ret = try_stop_module(mod, flags, &forced); // 和引用计数相关
 	if (ret != 0)
 		goto out;
 

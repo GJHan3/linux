@@ -905,7 +905,7 @@ static int iort_iommu_xlate(struct device *dev, struct acpi_iort_node *node,
 	 * in the kernel or not, defer the IOMMU configuration
 	 * or just abort it.
 	 */
-	ops = iommu_ops_from_fwnode(iort_fwnode);
+	ops = iommu_ops_from_fwnode(iort_fwnode); //通过acpi来使用iommu
 	if (!ops)
 		return iort_iommu_driver_enabled(node->type) ?
 		       -EPROBE_DEFER : -ENODEV;

@@ -1245,7 +1245,7 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
 	case PCI_CLASS_BRIDGE_PCI:
 		pci_bridge_check_ranges(bus);
 		if (bus->self->is_hotplug_bridge) {
-			additional_io_size  = pci_hotplug_io_size;
+			additional_io_size  = pci_hotplug_io_size; //如果桥设备有hotplug属性的话，那么就可以把
 			additional_mem_size = pci_hotplug_mem_size;
 		}
 		/* Fall through */
