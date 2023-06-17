@@ -2188,7 +2188,7 @@ long _do_fork(unsigned long clone_flags,
 		get_task_struct(p);
 	}
 
-	wake_up_new_task(p);
+	wake_up_new_task(p); //激活新线程
 
 	/* forking complete and child started to run, tell ptracer */
 	if (unlikely(trace))

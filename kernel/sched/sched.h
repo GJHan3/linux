@@ -1355,6 +1355,7 @@ static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 #define SCHED_FEAT(name, enabled)	\
 	__SCHED_FEAT_##name ,
 
+// 定义sched feature
 enum {
 #include "features.h"
 	__SCHED_FEAT_NR,

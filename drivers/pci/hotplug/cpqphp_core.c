@@ -684,7 +684,7 @@ static int ctrl_slot_setup(struct controller *ctrl,
 		dbg("registering bus %d, dev %d, number %d, ctrl->slot_device_offset %d, slot %d\n",
 				slot->bus, slot->device,
 				slot->number, ctrl->slot_device_offset,
-				slot_number);
+				slot_number); 
 		result = pci_hp_register(hotplug_slot,
 					 ctrl->pci_dev->bus,
 					 slot->device,

@@ -1519,6 +1519,7 @@ out:
 	return dest_cpu;
 }
 
+//挑选cpu
 /*
  * The caller (fork, wakeup) owns p->pi_lock, ->cpus_allowed is stable.
  */
@@ -1530,7 +1531,7 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
 	if (p->nr_cpus_allowed > 1)
 		cpu = p->sched_class->select_task_rq(p, cpu, sd_flags, wake_flags);
 	else
-		cpu = cpumask_any(&p->cpus_allowed);
+		cpu = cpumask_any(&p->cpus_allowed); //如果绑核了。
 
 	/*
 	 * In order not to call set_task_cpu() on a blocking task we need
@@ -3416,7 +3417,7 @@ static void __sched notrace __schedule(bool preempt)
 	update_rq_clock(rq);
 
 	switch_count = &prev->nivcsw;
-	if (!preempt && prev->state) {
+	if (!preempt && prev->state) { //如果不是被抢占， 并且state不是running状态。则脱离调度
 		if (unlikely(signal_pending_state(prev->state, prev))) {
 			prev->state = TASK_RUNNING;
 		} else {
