@@ -109,7 +109,9 @@ static void __init handle_initrd(void)
 
 bool __init initrd_load(void)
 {
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	if (mount_initrd) {
+		pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 		create_dev("/dev/ram", Root_RAM0);
 		/*
 		 * Load the initrd data into /dev/ram0. Execute it as initrd
@@ -117,12 +119,15 @@ bool __init initrd_load(void)
 		 * in that case the ram disk is just set up here, and gets
 		 * mounted in the normal path.
 		 */
+		pr_info("--->%s[%d]: ROOT_DEV != Root_RAM0? %d", __FUNCTION__, __LINE__, ROOT_DEV != Root_RAM0);
 		if (rd_load_image("/initrd.image") && ROOT_DEV != Root_RAM0) {
+			pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 			ksys_unlink("/initrd.image");
 			handle_initrd();
 			return true;
 		}
 	}
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	ksys_unlink("/initrd.image");
 	return false;
 }

@@ -185,25 +185,25 @@ int __init rd_load_image(char *from)
 #if !defined(CONFIG_S390)
 	char rotator[4] = { '|' , '/' , '-' , '\\' };
 #endif
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	out_fd = ksys_open("/dev/ram", O_RDWR, 0);
 	if (out_fd < 0)
 		goto out;
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	in_fd = ksys_open(from, O_RDONLY, 0);
 	if (in_fd < 0)
 		goto noclose_input;
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	nblocks = identify_ramdisk_image(in_fd, rd_image_start, &decompressor);
 	if (nblocks < 0)
 		goto done;
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	if (nblocks == 0) {
 		if (crd_load(in_fd, out_fd, decompressor) == 0)
 			goto successful_load;
 		goto done;
 	}
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	/*
 	 * NOTE NOTE: nblocks is not actually blocks but
 	 * the number of kibibytes of data to load into a ramdisk.
@@ -212,13 +212,13 @@ int __init rd_load_image(char *from)
 		rd_blocks = 0;
 	else
 		rd_blocks >>= 1;
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	if (nblocks > rd_blocks) {
 		printk("RAMDISK: image too big! (%dKiB/%ldKiB)\n",
 		       nblocks, rd_blocks);
 		goto done;
 	}
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	/*
 	 * OK, time to copy in the data
 	 */
@@ -226,7 +226,7 @@ int __init rd_load_image(char *from)
 		devblocks = 0;
 	else
 		devblocks >>= 1;
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	if (strcmp(from, "/initrd.image") == 0)
 		devblocks = nblocks;
 
@@ -234,7 +234,7 @@ int __init rd_load_image(char *from)
 		printk(KERN_ERR "RAMDISK: could not determine device size\n");
 		goto done;
 	}
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	buf = kmalloc(BLOCK_SIZE, GFP_KERNEL);
 	if (!buf) {
 		printk(KERN_ERR "RAMDISK: could not allocate buffer\n");

@@ -512,6 +512,7 @@ void __init mount_root(void)
 #ifdef CONFIG_BLK_DEV_FD
 	if (MAJOR(ROOT_DEV) == FLOPPY_MAJOR) {
 		/* rd_doload is 2 for a dual initrd/ramload setup */
+		pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 		if (rd_doload==2) {
 			if (rd_load_disk(1)) {
 				ROOT_DEV = Root_RAM1;
@@ -527,6 +528,7 @@ void __init mount_root(void)
 
 		if (err < 0)
 			pr_emerg("Failed to create /dev/root: %d\n", err);
+		pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 		mount_block_root("/dev/root", root_mountflags);
 	}
 #endif
@@ -570,9 +572,10 @@ void __init prepare_namespace(void)
 
 	if (initrd_load())
 		goto out;
-
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	/* wait for any asynchronous scanning to complete */
 	if ((ROOT_DEV == 0) && root_wait) {
+		pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 		printk(KERN_INFO "Waiting for root device %s...\n",
 			saved_root_name);
 		while (driver_probe_done() != 0 ||
@@ -583,9 +586,12 @@ void __init prepare_namespace(void)
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 
-	if (is_floppy && rd_doload && rd_load_disk(0))
+	if (is_floppy && rd_doload && rd_load_disk(0)) {
+		pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 		ROOT_DEV = Root_RAM0;
-
+	}
+		
+	pr_info("--->%s[%d]", __FUNCTION__, __LINE__);
 	mount_root();
 out:
 	devtmpfs_mount("dev");

@@ -608,6 +608,8 @@ static int __init populate_rootfs(void)
 #ifdef CONFIG_BLK_DEV_RAM
 		int fd;
 		printk(KERN_INFO "Trying to unpack rootfs image as initramfs...\n");
+		printk(KERN_INFO "__initramfs_start = 0x%llx, size = 0x%llx\n", __initramfs_start, __initramfs_size);
+		printk(KERN_INFO "initrd_start = 0x%llx, size = 0x%llx\n", initrd_start, initrd_end - initrd_start);
 		err = unpack_to_rootfs((char *)initrd_start,
 			initrd_end - initrd_start);
 		if (!err) {
