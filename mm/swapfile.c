@@ -3786,7 +3786,7 @@ void __cgroup_throttle_swaprate(struct page *page, gfp_t gfp_mask)
 
 	if (!(gfp_mask & __GFP_IO))
 		return;
-
+	/* swap判断io latency是否标记delay */
 	if (!blk_cgroup_congested())
 		return;
 

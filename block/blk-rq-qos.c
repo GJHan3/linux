@@ -262,10 +262,12 @@ void rq_qos_wait(struct rq_wait *rqw, void *private_data,
 	};
 	bool has_sleeper;
 
+	/* 如果没有sleeper：表示没有没人在竞争max_depth 
+	 * 问题是，第一个怎么加进去的？？？ 如果没有并且没有获得inflight，才会挂入等待链表 */
 	has_sleeper = wq_has_sleeper(&rqw->wait);
 	if (!has_sleeper && acquire_inflight_cb(rqw, private_data))
 		return;
-
+	/* 到这里，也就是depth之后的，会进入等待状态 */
 	has_sleeper = !prepare_to_wait_exclusive(&rqw->wait, &data.wq,
 						 TASK_UNINTERRUPTIBLE);
 	do {

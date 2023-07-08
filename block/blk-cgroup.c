@@ -1635,6 +1635,7 @@ static void blkcg_maybe_throttle_blkg(struct blkcg_gq *blkg, bool use_memdelay)
 	u64 delay_nsec = 0;
 	int tok;
 
+	/* 寻找到最大延迟 */
 	while (blkg->parent) {
 		int use_delay = atomic_read(&blkg->use_delay);
 
@@ -1663,6 +1664,7 @@ static void blkcg_maybe_throttle_blkg(struct blkcg_gq *blkg, bool use_memdelay)
 	 * blkcg_set_delay() was used as indicated by negative use_delay, the
 	 * caller is responsible for regulating the range.
 	 */
+	/* 最大的睡眠时间为 250ms */
 	if (clamp)
 		delay_nsec = min_t(u64, delay_nsec, 250 * NSEC_PER_MSEC);
 

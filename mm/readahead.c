@@ -601,7 +601,7 @@ void page_cache_async_ra(struct readahead_control *ractl,
 	 */
 	if (inode_read_congested(ractl->mapping->host))
 		return;
-
+	/* 判断io latency是否标记delay */
 	if (blk_cgroup_congested())
 		return;
 

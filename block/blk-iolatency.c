@@ -227,6 +227,7 @@ static inline bool latency_sum_ok(struct iolatency_grp *iolat,
 				  struct latency_stat *stat)
 {
 	if (iolat->ssd) {
+		/* miss io占总io超过1/10即触发 */
 		u64 thresh = div64_u64(stat->ps.total, 10);
 		thresh = max(thresh, 1ULL);
 		return stat->ps.missed < thresh;
@@ -285,6 +286,7 @@ static void __blkcg_iolatency_throttle(struct rq_qos *rqos,
 	struct rq_wait *rqw = &iolat->rq_wait;
 	unsigned use_delay = atomic_read(&lat_to_blkg(iolat)->use_delay);
 
+	/* 若使用delay直接调用blkcg_schedule_throttle */
 	if (use_delay)
 		blkcg_schedule_throttle(rqos->q, use_memdelay);
 
@@ -299,7 +301,10 @@ static void __blkcg_iolatency_throttle(struct rq_qos *rqos,
 		atomic_inc(&rqw->inflight);
 		return;
 	}
-
+	/* 这里是调度点 
+	 * inflight < max_depth 时执行，并增加inflight 
+	 * inflight >= max_depth 时 io_schedule() 
+	 */
 	rq_qos_wait(rqw, iolat, iolat_acquire_inflight, iolat_cleanup_cb);
 }
 
@@ -325,6 +330,7 @@ static void scale_cookie_change(struct blk_iolatency *blkiolat,
 				bool up)
 {
 	unsigned long qd = blkiolat->rqos.q->nr_requests;
+	/* 增加则是nr_requests的1/16，减少是nr_requests的1/4， 最少变化为1*/
 	unsigned long scale = scale_amount(qd, up);
 	unsigned long old = atomic_read(&lat_info->scale_cookie);
 	unsigned long max_scale = qd << 1;
@@ -333,11 +339,14 @@ static void scale_cookie_change(struct blk_iolatency *blkiolat,
 	if (old < DEFAULT_SCALE_COOKIE)
 		diff = DEFAULT_SCALE_COOKIE - old;
 
+	/* 是否为增加 */
 	if (up) {
+		/* 增加的值 + scale_amount 大于默认值，则取默认值*/
 		if (scale + old > DEFAULT_SCALE_COOKIE)
 			atomic_set(&lat_info->scale_cookie,
 				   DEFAULT_SCALE_COOKIE);
 		else if (diff > qd)
+			/* 对lat_info->scale_cookie + 1*/
 			atomic_inc(&lat_info->scale_cookie);
 		else
 			atomic_add(scale, &lat_info->scale_cookie);
@@ -348,10 +357,13 @@ static void scale_cookie_change(struct blk_iolatency *blkiolat,
 		 * with jagged workloads but can still unthrottle once pressure
 		 * has sufficiently dissipated.
 		 */
+		/* 如果差值大于queue的最大request数*/
 		if (diff > qd) {
+			/* 小于4倍的scale, 只减1 */
 			if (diff < max_scale)
 				atomic_dec(&lat_info->scale_cookie);
 		} else {
+			/* 如果差值不大，则只减scale. */
 			atomic_sub(scale, &lat_info->scale_cookie);
 		}
 	}
@@ -368,23 +380,32 @@ static void scale_change(struct iolatency_grp *iolat, bool up)
 	unsigned long scale = scale_amount(qd, up);
 	unsigned long old = iolat->rq_depth.max_depth;
 
+	/* 最大设置为queue Max Request数量, 默认128， 和设备相关 */
 	if (old > qd)
 		old = qd;
 
+	/* 如果是增加 */
 	if (up) {
 		if (old == 1 && blkcg_unuse_delay(lat_to_blkg(iolat)))
 			return;
 
 		if (old < qd) {
+			/* 增加 scale */
 			old += scale;
 			old = min(old, qd);
+			/* 重点: 这里关联了max_depth与scale */
 			iolat->rq_depth.max_depth = old;
 			wake_up_all(&iolat->rq_wait.wait);
 		}
 	} else {
+		/* 重点: 这里关联了max_depth与scale */
 		old >>= 1;
+		/* 缩小一半 */
 		iolat->rq_depth.max_depth = max(old, 1UL);
 	}
+	/* max_depth有什么用呢？
+	 * 见rq_qos_wait(rqw, iolat, iolat_acquire_inflight, iolat_cleanup_cb)
+	 */
 }
 
 /* Check our parent and see if the scale cookie has changed. */
@@ -393,38 +414,48 @@ static void check_scale_change(struct iolatency_grp *iolat)
 	struct iolatency_grp *parent;
 	struct child_latency_info *lat_info;
 	unsigned int cur_cookie;
+	/* 读取当前节点的scale_cookie */
 	unsigned int our_cookie = atomic_read(&iolat->scale_cookie);
 	u64 scale_lat;
 	unsigned int old;
 	int direction = 0;
-
+	/* 如果已经到根了， 则直接返回 */
 	if (lat_to_blkg(iolat)->parent == NULL)
 		return;
-
+	/* 找到parent的iolatency结构体 */
 	parent = blkg_to_lat(lat_to_blkg(iolat)->parent);
+	/* 如果parent没有就直接返回 */
 	if (!parent)
 		return;
-
+	/* 找到父节点对应的子节点iolatency信息 */
 	lat_info = &parent->child_lat;
+	/* 读取父节点cookie */
 	cur_cookie = atomic_read(&lat_info->scale_cookie);
+	/* The latency that we missed. */
 	scale_lat = READ_ONCE(lat_info->scale_lat);
-
+	/* 这个cookie存的是什么？ */
+	/* 与父节点的cookie对比，比较大小，看是否增加depth或者使用delay */
+	/* 父节点cookie < 当前cgroup cookie*/
 	if (cur_cookie < our_cookie)
 		direction = -1;
+	/* 父节点cookie > 当前cgroup cookie*/
 	else if (cur_cookie > our_cookie)
 		direction = 1;
 	else
 		return;
-
+	/* 到这里，说明两者的cookie不相等 */
+	/* 将父节点的child lat info中cookie放到当前iocgroup中 */
+	/* 问题：如果都不能满足latency是怎么办呢？？*/
 	old = atomic_cmpxchg(&iolat->scale_cookie, our_cookie, cur_cookie);
 
 	/* Somebody beat us to the punch, just bail. */
 	if (old != our_cookie)
 		return;
 
+	/* 当前值小了，并且设置了min_lat_nsec */
 	if (direction < 0 && iolat->min_lat_nsec) {
 		u64 samples_thresh;
-
+		/* 重点：这里看当前cgroup是否延迟<=父节点管理的子cgroup们, 即需要解决的延迟目标cgroup不参与限流策略 */
 		if (!scale_lat || iolat->min_lat_nsec <= scale_lat)
 			return;
 
@@ -434,26 +465,33 @@ static void check_scale_change(struct iolatency_grp *iolat)
 		 * or less of the IO's for the last summation just skip this
 		 * scale down event.
 		 */
+		/* Total io's from all of our children for the last summation. */
 		samples_thresh = lat_info->nr_samples * 5;
 		samples_thresh = max(1ULL, div64_u64(samples_thresh, 100));
 		if (iolat->nr_samples <= samples_thresh)
 			return;
 	}
 
+	/* 如果depth已经低到1， 并且想要继续低，那么不可能了， 用delay方法 */
 	/* We're as low as we can go. */
 	if (iolat->rq_depth.max_depth == 1 && direction < 0) {
+		/* 标记阻塞，在__cgroup_throttle_swaprate用到、禁止readahead */
 		blkcg_use_delay(lat_to_blkg(iolat));
 		return;
 	}
 
+	/* 如果回到DEFAULT_SCALE_COOKIE， 那么将rq_depth、delay都取消*/
 	/* We're back to the default cookie, unthrottle all the things. */
 	if (cur_cookie == DEFAULT_SCALE_COOKIE) {
 		blkcg_clear_delay(lat_to_blkg(iolat));
 		iolat->rq_depth.max_depth = UINT_MAX;
+		/* 激活限流等待 */
 		wake_up_all(&iolat->rq_wait.wait);
 		return;
 	}
-
+	/* 这里是通过修改rq_depth.max_depth来限流了 */
+	/* direction > 0 增加depth */
+	/* direction < 0 减小depth */
 	scale_change(iolat, direction > 0);
 }
 
@@ -467,17 +505,22 @@ static void blkcg_iolatency_throttle(struct rq_qos *rqos, struct bio *bio)
 		return;
 
 	while (blkg && blkg->parent) {
+		/* 找到对应cgroup的iolatency结构体 */
 		struct iolatency_grp *iolat = blkg_to_lat(blkg);
+		/* 如果当前cgroup没有iolatency结构体，就一直访问parent */
 		if (!iolat) {
 			blkg = blkg->parent;
 			continue;
 		}
-
+		/* 待定做什么： 更新rq_depth.max_depth与delay是否启用 
+		 * 好像只有这里更新了 */
 		check_scale_change(iolat);
 		__blkcg_iolatency_throttle(rqos, iolat, issue_as_root,
 				     (bio->bi_opf & REQ_SWAP) == REQ_SWAP);
 		blkg = blkg->parent;
 	}
+
+	/* 定时器，1s后调用 blkiolatency_timer_fn */
 	if (!timer_pending(&blkiolat->timer))
 		mod_timer(&blkiolat->timer, jiffies + HZ);
 }
@@ -530,6 +573,7 @@ static void iolatency_check_latencies(struct iolatency_grp *iolat, u64 now)
 	preempt_disable();
 	for_each_online_cpu(cpu) {
 		struct latency_stat *s;
+		/* 将当前block cgroup的per cpu统计值加到stat中 */
 		s = per_cpu_ptr(iolat->stats, cpu);
 		latency_stat_sum(iolat, &stat, s);
 		latency_stat_init(iolat, s);
@@ -545,6 +589,7 @@ static void iolatency_check_latencies(struct iolatency_grp *iolat, u64 now)
 	iolat_update_total_lat_avg(iolat, &stat);
 
 	/* Everything is ok and we don't need to adjust the scale. */
+	/* 不需要调整 */
 	if (latency_sum_ok(iolat, &stat) &&
 	    atomic_read(&lat_info->scale_cookie) == DEFAULT_SCALE_COOKIE)
 		return;
@@ -552,32 +597,45 @@ static void iolatency_check_latencies(struct iolatency_grp *iolat, u64 now)
 	/* Somebody beat us to the punch, just bail. */
 	spin_lock_irqsave(&lat_info->lock, flags);
 
+	/* iolat->cur_stat记录当前cgroup本次调整周期的数据 */
 	latency_stat_sum(iolat, &iolat->cur_stat, &stat);
+	/* lat_info 记录cgroup所有children group的总io量
+	 * iolat->nr_samples记录本group的io量
+	 */
 	lat_info->nr_samples -= iolat->nr_samples;
 	lat_info->nr_samples += latency_stat_samples(iolat, &iolat->cur_stat);
 	iolat->nr_samples = latency_stat_samples(iolat, &iolat->cur_stat);
-
+	/* 已经被更新过了 或者没有到调整周期500ns，则直接跳过调整 */
 	if ((lat_info->last_scale_event >= now ||
 	    now - lat_info->last_scale_event < BLKIOLATENCY_MIN_ADJUST_TIME))
 		goto out;
-
+	/* miss io占总io超过1/10即触发 并且刚才这一段时间也是miss io超过1/10才触发 */
 	if (latency_sum_ok(iolat, &iolat->cur_stat) &&
 	    latency_sum_ok(iolat, &stat)) {
+		/* 这次时间窗口的io数量样本不够 */
 		if (latency_stat_samples(iolat, &iolat->cur_stat) <
 		    BLKIOLATENCY_MIN_GOOD_SAMPLES)
 			goto out;
+		/* 这里表示，父节点限流了，并且出发限流的原因是当前cgroup
+		 * 但是现在已经完成了限流任务，那么就需要增加当前父节点的cookie
+		 */
 		if (lat_info->scale_grp == iolat) {
 			lat_info->last_scale_event = now;
+			/* 后续父节点下的子cgroup都将根据这个cookie调整max_depth */
 			scale_cookie_change(iolat->blkiolat, lat_info, true);
 		}
 	} else if (lat_info->scale_lat == 0 ||
 		   lat_info->scale_lat >= iolat->min_lat_nsec) {
 		lat_info->last_scale_event = now;
+		/* 如果父节点所管理的延迟大于当前cgroup */
 		if (!lat_info->scale_grp ||
 		    lat_info->scale_lat > iolat->min_lat_nsec) {
+			/* 将本cgroup的最小延迟更新到父亲节点 */
 			WRITE_ONCE(lat_info->scale_lat, iolat->min_lat_nsec);
+			/* 父节点标记上一次触发延迟目标的是当前cgroup */
 			lat_info->scale_grp = iolat;
 		}
+		/* 开始对这个父节点进行限流，后续父节点下的子cgroup都将根据这个cookie调整max_depth */
 		scale_cookie_change(iolat->blkiolat, lat_info, false);
 	}
 	latency_stat_init(iolat, &iolat->cur_stat);
@@ -609,6 +667,7 @@ static void blkcg_iolatency_done_bio(struct rq_qos *rqos, struct bio *bio)
 		return;
 
 	now = ktime_to_ns(ktime_get());
+	/* 由下而上，遍历所有的cgroup */
 	while (blkg && blkg->parent) {
 		iolat = blkg_to_lat(blkg);
 		if (!iolat) {
@@ -624,16 +683,19 @@ static void blkcg_iolatency_done_bio(struct rq_qos *rqos, struct bio *bio)
 		 * submitted, so do not account for it.
 		 */
 		if (iolat->min_lat_nsec && bio->bi_status != BLK_STS_AGAIN) {
+			/* 记录当前请求的延时情况 */
 			iolatency_record_time(iolat, &bio->bi_issue, now,
 					      issue_as_root);
 			window_start = atomic64_read(&iolat->window_start);
 			if (now > window_start &&
 			    (now - window_start) >= iolat->cur_win_nsec) {
+				/* 若超过窗口时间，开始进行限流控制 */
 				if (atomic64_cmpxchg(&iolat->window_start,
 					     window_start, now) == window_start)
 					iolatency_check_latencies(iolat, now);
 			}
 		}
+		/* 这里会激活所有被限流的线程 */
 		wake_up(&rqw->wait);
 		blkg = blkg->parent;
 	}
@@ -681,12 +743,15 @@ static void blkiolatency_timer_fn(struct timer_list *t)
 			goto next;
 
 		lat_info = &iolat->child_lat;
+		/* 读取每个层级的child_lat->scale_cookie */
 		cookie = atomic_read(&lat_info->scale_cookie);
 
+		/* 如果cookie 大于 default则不处理 */
 		if (cookie >= DEFAULT_SCALE_COOKIE)
 			goto next;
 
 		spin_lock_irqsave(&lat_info->lock, flags);
+		/* 如果上次变更的时刻超过此时刻，则已经被更新过了，不处理 */
 		if (lat_info->last_scale_event >= now)
 			goto next_lock;
 
@@ -694,6 +759,7 @@ static void blkiolatency_timer_fn(struct timer_list *t)
 		 * We scaled down but don't have a scale_grp, scale up and carry
 		 * on.
 		 */
+		/* 如果没有scale group， 则scale_cookie_change */
 		if (lat_info->scale_grp == NULL) {
 			scale_cookie_change(iolat->blkiolat, lat_info, true);
 			goto next_lock;
@@ -704,6 +770,7 @@ static void blkiolatency_timer_fn(struct timer_list *t)
 		 * scale grp in case the group that needed the scale down isn't
 		 * doing any IO currently.
 		 */
+		/* 上次sclae event已经过去5s，把scale group设置为NULL */
 		if (now - lat_info->last_scale_event >=
 		    ((u64)NSEC_PER_SEC * 5))
 			lat_info->scale_grp = NULL;
@@ -965,7 +1032,7 @@ static void iolatency_pd_init(struct blkg_policy_data *pd)
 	struct blk_iolatency *blkiolat = BLKIOLATENCY(rqos);
 	u64 now = ktime_to_ns(ktime_get());
 	int cpu;
-
+	/* 判断非旋转设备，即固态和硬盘的区别 */
 	if (blk_queue_nonrot(blkg->q))
 		iolat->ssd = true;
 	else

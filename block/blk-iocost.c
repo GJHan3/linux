@@ -1087,7 +1087,7 @@ static void __propagate_weights(struct ioc_gq *iocg, u32 active, u32 inuse,
 
 	if (active == iocg->active && inuse == iocg->inuse)
 		return;
-
+	/* 这里开始由下而上的更新 */
 	for (lvl = iocg->level - 1; lvl >= 0; lvl--) {
 		struct ioc_gq *parent = iocg->ancestors[lvl];
 		struct ioc_gq *child = iocg->ancestors[lvl + 1];
@@ -1097,7 +1097,9 @@ static void __propagate_weights(struct ioc_gq *iocg, u32 active, u32 inuse,
 		parent->child_active_sum += (s32)(active - child->active);
 		parent->child_inuse_sum += (s32)(inuse - child->inuse);
 		/* apply the updates */
+		/* active 记录的是权重 */
 		child->active = active;
+		/* inuse 记录的是过剩调整后的权重 */
 		child->inuse = inuse;
 
 		/*
@@ -1107,6 +1109,7 @@ static void __propagate_weights(struct ioc_gq *iocg, u32 active, u32 inuse,
 		 */
 		if (parent->child_active_sum) {
 			parent_active = parent->weight;
+			/* 这里记录了parent的实际权重值 */
 			parent_inuse = DIV64_U64_ROUND_UP(
 				parent_active * parent->child_inuse_sum,
 				parent->child_active_sum);
@@ -1168,6 +1171,7 @@ static void current_hweight(struct ioc_gq *iocg, u32 *hw_activep, u32 *hw_inusep
 	smp_rmb();
 
 	hwa = hwi = WEIGHT_ONE;
+	/* 计算hweight */
 	for (lvl = 0; lvl <= iocg->level - 1; lvl++) {
 		struct ioc_gq *parent = iocg->ancestors[lvl];
 		struct ioc_gq *child = iocg->ancestors[lvl + 1];
@@ -1231,8 +1235,12 @@ static void weight_updated(struct ioc_gq *iocg, struct ioc_now *now)
 	u32 weight;
 
 	lockdep_assert_held(&ioc->lock);
-
+	/* cfg_weight表示的是在cgroup的per设备weight， dfl_weight表示的cgroup的weight
+	 * dfl_weight值应该是要对当前cgroup下的所有设备生效？？？ 待确认 
+	 */
+	/* 这里的意思是如果对每个设备设置了weight就用这个权重，否则使用cgroup的权重 */
 	weight = iocg->cfg_weight ?: iocc->dfl_weight;
+	/* 更新权重 */
 	if (weight != iocg->weight && iocg->active)
 		propagate_weights(iocg, weight, iocg->inuse, true, now);
 	iocg->weight = weight;
@@ -2629,6 +2637,7 @@ retry_lock:
 	 */
 	if (use_debt) {
 		iocg_incur_debt(iocg, abs_cost, &now);
+		/* 这里是用用户态delay的方法 设置blkcg_set_delay，返回用户态前设置delay */
 		if (iocg_kick_delay(iocg, &now))
 			blkcg_schedule_throttle(rqos->q,
 					(bio->bi_opf & REQ_SWAP) == REQ_SWAP);
@@ -2675,6 +2684,7 @@ retry_lock:
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (wait.committed)
 			break;
+		/* 当前线程挂起， 等待被唤醒 */
 		io_schedule();
 	}
 
@@ -3057,12 +3067,15 @@ static ssize_t ioc_weight_write(struct kernfs_open_file *of, char *buf,
 			return -EINVAL;
 
 		spin_lock_irq(&blkcg->lock);
+		/* 设置cgroup的weight */
 		iocc->dfl_weight = v * WEIGHT_ONE;
 		hlist_for_each_entry(blkg, &blkcg->blkg_list, blkcg_node) {
+			/* 遍历这个cgroup的所有设备绑定的blkg， 因为这个权重需要更新要所有的设备上去 */
 			struct ioc_gq *iocg = blkg_to_iocg(blkg);
 
 			if (iocg) {
 				spin_lock(&iocg->ioc->lock);
+				/* take a snapshot of the current [v]time and vrate */
 				ioc_now(iocg->ioc, &now);
 				weight_updated(iocg, &now);
 				spin_unlock(&iocg->ioc->lock);
@@ -3087,7 +3100,7 @@ static ssize_t ioc_weight_write(struct kernfs_open_file *of, char *buf,
 		if (v < CGROUP_WEIGHT_MIN || v > CGROUP_WEIGHT_MAX)
 			goto einval;
 	}
-
+	/* per设备的weight */
 	spin_lock(&iocg->ioc->lock);
 	iocg->cfg_weight = v * WEIGHT_ONE;
 	ioc_now(iocg->ioc, &now);
@@ -3160,7 +3173,7 @@ static ssize_t ioc_qos_write(struct kernfs_open_file *of, char *input,
 	bool enable, user;
 	char *p;
 	int ret;
-
+	/* 需要对某个设备使用 */
 	bdev = blkcg_conf_open_bdev(&input);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
@@ -3187,7 +3200,7 @@ static ssize_t ioc_qos_write(struct kernfs_open_file *of, char *input,
 
 		if (!*p)
 			continue;
-
+		/* 控制参数 */
 		switch (match_token(p, qos_ctrl_tokens, args)) {
 		case QOS_ENABLE:
 			match_u64(&args[0], &v);
@@ -3203,7 +3216,7 @@ static ssize_t ioc_qos_write(struct kernfs_open_file *of, char *input,
 				goto einval;
 			continue;
 		}
-
+		/* QOS相关参数 qos_tokens */
 		tok = match_token(p, qos_tokens, args);
 		switch (tok) {
 		case QOS_RPPM:
@@ -3365,6 +3378,7 @@ static ssize_t ioc_cost_model_write(struct kernfs_open_file *of, char *input,
 				goto einval;
 			continue;
 		case COST_MODEL:
+			/* 模型， 当前只有线性的 */
 			match_strlcpy(buf, &args[0], sizeof(buf));
 			if (strcmp(buf, "linear"))
 				goto einval;
@@ -3408,7 +3422,7 @@ static struct cftype ioc_files[] = {
 		.write = ioc_weight_write,
 	},
 	{
-		.name = "cost.qos",
+		.name = "cost.qos", /* 设置参数的 */
 		.flags = CFTYPE_ONLY_ON_ROOT,
 		.seq_show = ioc_qos_show,
 		.write = ioc_qos_write,
