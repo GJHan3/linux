@@ -3755,6 +3755,7 @@ static int merge_sched_in(struct perf_event *event, void *data)
 			perf_event_set_state(event, PERF_EVENT_STATE_ERROR);
 		} else {
 			ctx->rotate_necessary = 1;
+			/* 启动定时器等待被换入 */
 			perf_mux_hrtimer_restart(cpuctx);
 			group_update_userpage(event);
 		}
@@ -10947,7 +10948,7 @@ perf_event_mux_interval_ms_store(struct device *dev,
 		struct perf_cpu_context *cpuctx;
 		cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
 		cpuctx->hrtimer_interval = ns_to_ktime(NSEC_PER_MSEC * timer);
-
+		/* 修改替换时间间隔后，对每个cpu启动定时器，准备替换event */
 		cpu_function_call(cpu,
 			(remote_function_f)perf_mux_hrtimer_restart, cpuctx);
 	}
