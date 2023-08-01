@@ -1135,6 +1135,7 @@ static enum hrtimer_restart perf_mux_hrtimer_handler(struct hrtimer *hr)
 	lockdep_assert_irqs_disabled();
 
 	cpuctx = container_of(hr, struct perf_cpu_context, hrtimer);
+	/* 周期性替换event */
 	rotations = perf_rotate_context(cpuctx);
 
 	raw_spin_lock(&cpuctx->hrtimer_lock);
